@@ -1,4 +1,4 @@
-# FinMark Login Prototype
+# FinMark Prototype
 
 This repository contains a functional prototype of a user login module for the FinMark project, developed as part of Milestone 2. It demonstrates a clean architecture with a Python FastAPI backend and a simple HTML/CSS/JavaScript frontend.
 

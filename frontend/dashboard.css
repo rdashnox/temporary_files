@@ -1,18 +1,6 @@
 /*
-    Assigned to: Aleczandra
-    Task: Frontend Task 5 - Create Simple Dashboard Page (Styling)
-
-    Description:
-    This file is for styling the 'dashboard.html' page.
-    The goal is to provide appealing and consistent styling for the dashboard.
-
-    Deliverables:
-    1.  Refine the existing CSS rules in this file to style the 'dashboard.html' page.
-    2.  Ensure the styling is clean, readable, and complements the login page's (eventually improved) design.
-
-    Considerations:
-    -   Coordinate with Aleczandra (who is also working on dashboard.html content) to ensure styles match structure.
-    -   Keep it simple; the primary focus is on functionality and basic presentation.
+    This CSS file provides basic styling for the dashboard.html page.
+    It should ensure the dashboard is presentable and consistent with the application's theme.
 */
 body {
     font-family: Arial, sans-serif;

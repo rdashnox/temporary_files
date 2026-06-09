@@ -1,0 +1,35 @@
+# Node.js
+node_modules/
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv
+venv/
+env/
+.Python
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor-specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Logs and databases
+*.log
+*.db
+*.sqlite3
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Frontend build artifacts
+build/
+dist/

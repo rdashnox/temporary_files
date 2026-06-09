@@ -1,0 +1,92 @@
+/*
+    Assigned to: Kenneth
+    Task: Frontend Task 1 - Enhance Login Page UI/UX (CSS focus)
+
+    Description:
+    This task involves significantly improving the visual design of the FinMark login page through CSS.
+    Focus on making the page look more modern, professional, and responsive across various device sizes.
+
+    Deliverables:
+    1.  Refine this 'style.css' file to implement a new, appealing color scheme, typography, spacing,
+        and overall layout.
+    2.  Apply responsive design principles using media queries to ensure optimal viewing and
+        interaction experience on both desktop and mobile browsers.
+    3.  Ensure consistency with FinMark's (imagined) brand identity (e.g., professional blues, grays, etc.).
+
+    Considerations:
+    -   Coordinate with Franze (Frontend Task 2) who is working on 'index.html' to ensure structural elements
+        support your design vision.
+    -   Ensure good contrast for readability and accessibility.
+    -   Do NOT change element IDs or classes that are used by 'script.js' or 'index.html' unless agreed upon.
+*/
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+.login-container {
+    background-color: #fff;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    width: 350px;
+}
+
+.login-form h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.form-group input[type="email"],
+.form-group input[type="password"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+button[type="submit"] {
+    width: 100%;
+    padding: 10px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button[type="submit"]:hover {
+    background-color: #0056b3;
+}
+
+.message {
+    text-align: center;
+    margin-top: 15px;
+    font-weight: bold;
+}
+
+.message.error {
+    color: #dc3545;
+}
+
+.message.success {
+    color: #28a745;
+}

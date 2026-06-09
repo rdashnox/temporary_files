@@ -1,0 +1,47 @@
+<!--
+    Assigned to: Franze
+    Task: Frontend Task 2 - Enhance Login Page UI/UX (HTML structure & Assets)
+
+    Description:
+    This task focuses on improving the HTML structure of the login page and integrating any
+    necessary static assets (like a logo placeholder).
+
+    Deliverables:
+    1.  Modify this 'index.html' file to enhance its semantic structure, potentially using
+        new HTML5 elements for better organization.
+    2.  Add a placeholder for a FinMark logo (e.g., an `<img>` tag pointing to a dummy image or SVG).
+    3.  Ensure the HTML is clean, accessible, and provides a solid foundation for styling.
+
+    Considerations:
+    -   Coordinate closely with Member Kenneth (Frontend Task 1) who is working on the CSS styling.
+    -   Do NOT change the form's input 'id' or 'name' attributes ('username', 'password') or the 'loginForm' ID,
+        as these are used by 'script.js'.
+    -   Do NOT remove the 'message' paragraph element, as 'script.js' uses it for feedback.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinMark Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="login-container">
+        <form id="loginForm" class="login-form">
+            <h2>FinMark Login</h2>
+            <div class="form-group">
+                <label for="username">Email:</label>
+                <input type="email" id="username" name="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+            <p id="message" class="message"></p>
+        </form>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -29,7 +29,7 @@ Follow these steps to get the FinMark Login Prototype running on your local mach
 
 1.  **Navigate to the backend directory:**
     ```bash
-    cd "C:\MMDC\Y3 T3\SUBJECTS\P-T\Milestone 2\Project Prototype\backend"
+    cd "backend"
     ```
 2.  **Activate the Python virtual environment:**
     ```bash
@@ -46,11 +46,11 @@ Follow these steps to get the FinMark Login Prototype running on your local mach
 
 1.  **Navigate to the frontend directory:**
     ```bash
-    cd "C:\MMDC\Y3 T3\SUBJECTS\P-T\Milestone 2\Project Prototype\frontend"
+    cd "frontend"
     ```
 2.  **Open `index.html` in your web browser.**
     You can do this by simply double-clicking the `index.html` file in your file explorer, or by typing `start index.html` in the command line (on Windows).
-    The login page should open in your default browser, typically at a URL like `file:///C:/MMDC/Y3 T3/SUBJECTS/P-T/Milestone 2/Project Prototype/frontend/index.html`.
+    The login page should open in your default browser, typically at a URL like `file:///frontend/index.html`.
 
 ### 3. Test the Login
 

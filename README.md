@@ -30,17 +30,17 @@ FinMark is a FastAPI + React prototype for authenticated commerce workflows. The
 ## Latest Upgrade
 
 
-### Ware Sync-Inspired Dashboard UI
+### White Professional Dashboard UI
 
-The active React dashboard was redesigned from the uploaded Ware Sync-style reference image. The new UI includes:
+The active React dashboard was refreshed into a clean white professional admin-dashboard interface. The new UI includes:
 
-- Light warm dashboard theme
+- White, slate, and blue enterprise dashboard theme
 - Fixed rounded sidebar
-- Orange primary action buttons
+- Professional blue primary action buttons
 - Search bar, low-stock pill, notification button, and profile chip
 - KPI cards with mini bar charts
-- Purple countdown card
-- Product cards styled like the reference worker cards
+- Neutral white countdown card with subtle blue accents
+- Clean product cards with better spacing, borders, and stock indicators
 - Stock status pills and segmented stock progress bars
 - Right-side activity feed
 - Cart and checkout panel integrated into the right rail
@@ -48,7 +48,7 @@ The active React dashboard was redesigned from the uploaded Ware Sync-style refe
 Additional design analysis is documented in:
 
 ```text
-SCREENSHOT_UI_ANALYSIS.md
+DEEP_ANALYSIS_WHITE_UI_UPGRADE.md
 ```
 
 ### React Add-to-Cart Dashboard
@@ -249,3 +249,49 @@ This is still a prototype. For a production-grade system, the next best upgrades
 6. Move token storage from `localStorage` to secure HttpOnly cookies.
 7. Add payment provider integration.
 8. Add Redis caching for product catalog and dashboard metrics.
+
+## MySQL 1045 Access Denied Fix
+
+If backend startup shows:
+
+```text
+Access denied for user 'root'@'localhost'
+```
+
+run this in MySQL Workbench:
+
+```text
+backend/scripts/fix_mysql_access_denied.sql
+```
+
+Then set your project-level `.env` to:
+
+```env
+DATABASE_URL=mysql+pymysql://finmark_app:FinmarkApp123@127.0.0.1:3306/finmark_db
+```
+
+Test it with:
+
+```powershell
+python -m backend.scripts.check_database_connection
+```
+
+
+## Full Refactor Notes
+
+This version includes a backend architecture refactor with separated schemas, services, dependencies, security utilities, and database configuration.
+
+For database configuration, you may now use separated `.env` values:
+
+```env
+DB_DRIVER=mysql+pymysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_NAME=finmark_db
+DB_USER=root
+DB_PASSWORD=your_mysql_password
+```
+
+`DATABASE_URL` is still supported as an override, but it is no longer required for local MySQL Workbench setup.
+
+See `FULL_REFACTOR_GUIDE.md` for the complete explanation.

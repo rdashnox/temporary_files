@@ -31,7 +31,7 @@ export default function VerifyEmailPage({ onBackToLogin }) {
   }, [onBackToLogin, token]);
 
   return (
-    <main className="login-container auth-container legacy-auth-page">
+    <main className="login-container auth-container auth-page">
       <section className="auth-card">
         <h2>Verify Email</h2>
         <p id="verifyMessage" className={`message ${message.type || ''}`} role="status" aria-live="polite">

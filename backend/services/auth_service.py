@@ -2,52 +2,33 @@ from datetime import datetime, timedelta, timezone
 from secrets import token_urlsafe
 from typing import Optional
 
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from sqlalchemy import or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from ..core.config import settings
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-# In-memory store for demonstration purposes only.
-# A real application should replace this with a database table.
-_IN_MEMORY_USERS = {}
-
-
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+from ..core.security import (
+    create_jwt_token,
+    decode_token,
+    hash_password,
+    now_utc,
+    validate_password_strength,
+    verify_password,
+)
+from ..models import AuditAction, Role, User
+from .audit_service import create_audit_log
 
 
 def _normalize_username(username: str) -> str:
     return username.strip().lower()
 
 
-def hash_password(password: str) -> str:
-    """Hash a plain-text password using bcrypt."""
-    return pwd_context.hash(password)
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a plain password against a bcrypt hash."""
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def validate_password_strength(password: str) -> list[str]:
-    """Return a list of password policy errors. Empty list means the password is valid."""
-    errors = []
-
-    if len(password) < 8:
-        errors.append("Password must be at least 8 characters long.")
-    if not any(char.islower() for char in password):
-        errors.append("Password must contain at least one lowercase letter.")
-    if not any(char.isupper() for char in password):
-        errors.append("Password must contain at least one uppercase letter.")
-    if not any(char.isdigit() for char in password):
-        errors.append("Password must contain at least one number.")
-    if not any(not char.isalnum() for char in password):
-        errors.append("Password must contain at least one special character.")
-
-    return errors
+def _is_expired(expires_at: datetime | None) -> bool:
+    if expires_at is None:
+        return True
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at < now_utc()
 
 
 def _build_frontend_link(path: str, token: str) -> str:
@@ -55,71 +36,96 @@ def _build_frontend_link(path: str, token: str) -> str:
     return f"{base_url}/{path}?token={token}"
 
 
-def _create_email_verification_token(username: str) -> str:
+def safe_user(user: User) -> dict:
+    permissions = sorted(
+        {
+            permission.code
+            for role in user.roles
+            for permission in role.permissions
+            if role.is_active
+        }
+    )
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "is_active": user.is_active,
+        "is_verified": user.is_verified,
+        "roles": [role.name for role in user.roles if role.is_active],
+        "permissions": permissions,
+    }
+
+
+def get_user_model_by_username(db: Session, username: str) -> User | None:
+    normalized_username = _normalize_username(username)
+    return db.scalar(
+        select(User).where(
+            or_(User.username == normalized_username, User.email == normalized_username)
+        )
+    )
+
+
+def _get_default_role(db: Session) -> Role:
+    role = db.scalar(select(Role).where(Role.name == "Staff"))
+    if role is None:
+        role = Role(name="Staff", description="Default staff role")
+        db.add(role)
+        db.flush()
+    return role
+
+
+def _create_email_verification_token(db: Session, user: User) -> str:
     token = token_urlsafe(32)
-    user = _IN_MEMORY_USERS[_normalize_username(username)]
-    user["verification_token"] = token
-    user["verification_token_expires_at"] = _now() + timedelta(
+    user.verification_token = token
+    user.verification_token_expires_at = now_utc() + timedelta(
         minutes=settings.email_token_expire_minutes
     )
+    db.flush()
     return token
 
 
-def _create_password_reset_token(username: str) -> str:
+def _create_password_reset_token(db: Session, user: User) -> str:
     token = token_urlsafe(32)
-    user = _IN_MEMORY_USERS[_normalize_username(username)]
-    user["password_reset_token"] = token
-    user["password_reset_token_expires_at"] = _now() + timedelta(
+    user.password_reset_token = token
+    user.password_reset_token_expires_at = now_utc() + timedelta(
         minutes=settings.password_reset_token_expire_minutes
     )
+    db.flush()
     return token
 
 
-def _seed_demo_user() -> None:
-    """Create a verified demo user without storing a plain-text password."""
-    demo_username = "user@example.com"
-    if demo_username not in _IN_MEMORY_USERS:
-        _IN_MEMORY_USERS[demo_username] = {
-            "username": demo_username,
-            "hashed_password": hash_password("Password123!"),
-            "is_verified": True,
-            "verification_token": None,
-            "verification_token_expires_at": None,
-            "password_reset_token": None,
-            "password_reset_token_expires_at": None,
-        }
+def verify_login(db: Session, username: str, password: str) -> Optional[dict]:
+    """Verify credentials against the database using bcrypt hashes."""
+    user = get_user_model_by_username(db, username)
 
-
-_seed_demo_user()
-
-
-def verify_login(username: str, password: str) -> Optional[dict]:
-    """
-    Verify user credentials against the in-memory user store.
-    Passwords are checked using bcrypt hashes, not plain-text comparison.
-    """
-    normalized_username = _normalize_username(username)
-    user = _IN_MEMORY_USERS.get(normalized_username)
-
-    if not user:
+    if not user or not user.is_active:
         return None
 
-    if not user.get("is_verified"):
+    if not user.is_verified:
         raise PermissionError("Please verify your email before logging in.")
 
-    if not verify_password(password, user["hashed_password"]):
+    if not verify_password(password, user.hashed_password):
         return None
 
-    return {"username": user["username"]}
+    user.last_login_at = now_utc()
+    create_audit_log(
+        db,
+        actor=user,
+        action=AuditAction.LOGIN,
+        entity_type="users",
+        entity_id=str(user.id),
+        detail="User logged in successfully.",
+    )
+    db.commit()
+    db.refresh(user)
+    return safe_user(user)
 
 
-def register_user(username: str, password: str, confirm_password: str) -> dict:
-    """
-    Register a new user with a bcrypt-hashed password and verification token.
-    """
+def register_user(db: Session, username: str, password: str, confirm_password: str) -> dict:
+    """Register a new user with a bcrypt-hashed password and DB-backed token."""
     normalized_username = _normalize_username(username)
 
-    if normalized_username in _IN_MEMORY_USERS:
+    if get_user_model_by_username(db, normalized_username):
         raise ValueError("User already exists")
 
     if password != confirm_password:
@@ -129,19 +135,32 @@ def register_user(username: str, password: str, confirm_password: str) -> dict:
     if password_errors:
         raise ValueError(" ".join(password_errors))
 
-    _IN_MEMORY_USERS[normalized_username] = {
-        "username": normalized_username,
-        "hashed_password": hash_password(password),
-        "is_verified": False,
-        "verification_token": None,
-        "verification_token_expires_at": None,
-        "password_reset_token": None,
-        "password_reset_token_expires_at": None,
-    }
+    user = User(
+        username=normalized_username,
+        email=normalized_username,
+        hashed_password=hash_password(password),
+        is_verified=False,
+        is_active=True,
+        roles=[_get_default_role(db)],
+    )
+    db.add(user)
 
-    verification_token = _create_email_verification_token(normalized_username)
+    try:
+        db.flush()
+        verification_token = _create_email_verification_token(db, user)
+        create_audit_log(
+            db,
+            actor=user,
+            action=AuditAction.CREATE,
+            entity_type="users",
+            entity_id=str(user.id),
+            detail="User registered and verification token generated.",
+        )
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise ValueError("User already exists") from exc
 
-    # Do not return password hashes to controllers/routes.
     return {
         "username": normalized_username,
         "verification_token": verification_token,
@@ -149,35 +168,42 @@ def register_user(username: str, password: str, confirm_password: str) -> dict:
     }
 
 
-def verify_email(token: str) -> dict:
-    """Mark a user as verified if the email verification token is valid."""
-    for user in _IN_MEMORY_USERS.values():
-        if user.get("verification_token") != token:
-            continue
+def verify_email(db: Session, token: str) -> dict:
+    user = db.scalar(select(User).where(User.verification_token == token))
 
-        expires_at = user.get("verification_token_expires_at")
-        if not expires_at or expires_at < _now():
-            raise ValueError("Verification link has expired")
+    if not user:
+        raise ValueError("Invalid verification token")
 
-        user["is_verified"] = True
-        user["verification_token"] = None
-        user["verification_token_expires_at"] = None
-        return {"username": user["username"]}
+    if _is_expired(user.verification_token_expires_at):
+        raise ValueError("Verification link has expired")
 
-    raise ValueError("Invalid verification token")
+    user.is_verified = True
+    user.verification_token = None
+    user.verification_token_expires_at = None
+    create_audit_log(
+        db,
+        actor=user,
+        action=AuditAction.VERIFY_EMAIL,
+        entity_type="users",
+        entity_id=str(user.id),
+        detail="User verified email address.",
+    )
+    db.commit()
+    db.refresh(user)
+    return safe_user(user)
 
 
-def resend_verification_email(username: str) -> dict:
-    """Create a new verification token for an unverified account."""
+def resend_verification_email(db: Session, username: str) -> dict:
     normalized_username = _normalize_username(username)
-    user = _IN_MEMORY_USERS.get(normalized_username)
+    user = get_user_model_by_username(db, normalized_username)
 
     if not user:
         raise ValueError("User not found")
-    if user.get("is_verified"):
+    if user.is_verified:
         raise ValueError("User is already verified")
 
-    token = _create_email_verification_token(normalized_username)
+    token = _create_email_verification_token(db, user)
+    db.commit()
     return {
         "username": normalized_username,
         "verification_token": token,
@@ -185,19 +211,16 @@ def resend_verification_email(username: str) -> dict:
     }
 
 
-def request_password_reset(username: str) -> dict:
-    """
-    Create a reset token for an account.
-    Demo note: returns a link so the flow can be tested without an email provider.
-    """
+def request_password_reset(db: Session, username: str) -> dict:
     normalized_username = _normalize_username(username)
-    user = _IN_MEMORY_USERS.get(normalized_username)
+    user = get_user_model_by_username(db, normalized_username)
 
     # Avoid account enumeration: public message stays generic in the route.
-    if not user:
+    if not user or not user.is_active:
         return {"username": normalized_username, "reset_token": None, "reset_link": None}
 
-    token = _create_password_reset_token(normalized_username)
+    token = _create_password_reset_token(db, user)
+    db.commit()
     return {
         "username": normalized_username,
         "reset_token": token,
@@ -205,8 +228,7 @@ def request_password_reset(username: str) -> dict:
     }
 
 
-def reset_password(token: str, new_password: str, confirm_password: str) -> dict:
-    """Reset a user's password if the reset token is valid and the new password is strong."""
+def reset_password(db: Session, token: str, new_password: str, confirm_password: str) -> dict:
     if new_password != confirm_password:
         raise ValueError("Passwords do not match")
 
@@ -214,68 +236,44 @@ def reset_password(token: str, new_password: str, confirm_password: str) -> dict
     if password_errors:
         raise ValueError(" ".join(password_errors))
 
-    for user in _IN_MEMORY_USERS.values():
-        if user.get("password_reset_token") != token:
-            continue
+    user = db.scalar(select(User).where(User.password_reset_token == token))
 
-        expires_at = user.get("password_reset_token_expires_at")
-        if not expires_at or expires_at < _now():
-            raise ValueError("Password reset link has expired")
+    if not user:
+        raise ValueError("Invalid password reset token")
 
-        user["hashed_password"] = hash_password(new_password)
-        user["password_reset_token"] = None
-        user["password_reset_token_expires_at"] = None
-        return {"username": user["username"]}
+    if _is_expired(user.password_reset_token_expires_at):
+        raise ValueError("Password reset link has expired")
 
-    raise ValueError("Invalid password reset token")
-
-
-def _create_jwt_token(username: str, token_type: str, expires_delta: timedelta) -> str:
-    expires_at = _now() + expires_delta
-    claims = {
-        "sub": _normalize_username(username),
-        "exp": expires_at,
-        "type": token_type,
-    }
-    return jwt.encode(claims, settings.secret_key, algorithm=settings.algorithm)
+    user.hashed_password = hash_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires_at = None
+    create_audit_log(
+        db,
+        actor=user,
+        action=AuditAction.PASSWORD_RESET,
+        entity_type="users",
+        entity_id=str(user.id),
+        detail="User reset password successfully.",
+    )
+    db.commit()
+    db.refresh(user)
+    return safe_user(user)
 
 
 def create_access_token(username: str) -> str:
-    """Create a signed JWT access token using python-jose."""
-    return _create_jwt_token(
-        username,
+    return create_jwt_token(
+        _normalize_username(username),
         "access",
         timedelta(minutes=settings.access_token_expire_minutes),
     )
 
 
 def create_refresh_token(username: str) -> str:
-    """Create a signed JWT refresh token using python-jose."""
-    return _create_jwt_token(
-        username,
+    return create_jwt_token(
+        _normalize_username(username),
         "refresh",
         timedelta(days=settings.refresh_token_expire_days),
     )
-
-
-def decode_token(token: str, expected_type: str) -> Optional[dict]:
-    """Decode and validate a signed JWT token by token type."""
-    try:
-        payload = jwt.decode(
-            token,
-            settings.secret_key,
-            algorithms=[settings.algorithm],
-        )
-    except JWTError:
-        return None
-
-    username = payload.get("sub")
-    token_type = payload.get("type")
-
-    if not username or token_type != expected_type:
-        return None
-
-    return payload
 
 
 def decode_access_token(token: str) -> Optional[dict]:
@@ -294,27 +292,20 @@ def create_token_pair(username: str) -> dict:
     }
 
 
-def refresh_access_token(refresh_token: str) -> Optional[dict]:
+def refresh_access_token(db: Session, refresh_token: str) -> Optional[dict]:
     payload = decode_refresh_token(refresh_token)
     if not payload:
         return None
 
-    user = get_user_by_username(payload["sub"])
-    if not user:
+    user = get_user_by_username(db, payload["sub"])
+    if not user or not user.get("is_verified") or not user.get("is_active"):
         return None
 
     return create_token_pair(user["username"])
 
 
-def get_user_by_username(username: str) -> Optional[dict]:
-    """Return safe user data for an existing username."""
-    normalized_username = _normalize_username(username)
-    user = _IN_MEMORY_USERS.get(normalized_username)
-
+def get_user_by_username(db: Session, username: str) -> Optional[dict]:
+    user = get_user_model_by_username(db, username)
     if not user:
         return None
-
-    return {
-        "username": user["username"],
-        "is_verified": user.get("is_verified", False),
-    }
+    return safe_user(user)

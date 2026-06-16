@@ -84,7 +84,7 @@ export default function ResetPasswordPage({ onBackToLogin }) {
   };
 
   return (
-    <main className="login-container auth-container legacy-auth-page">
+    <main className="login-container auth-container auth-page">
       <section className="auth-card">
         <form id="resetPasswordForm" className="login-form auth-form" onSubmit={handleSubmit}>
           <h2>Reset Password</h2>

@@ -164,3 +164,42 @@ def test_business_modules_route_returns_dashboard_view_model_for_verified_user()
     assert data["orders"]["statuses"]
     assert data["access"]["roles"]
     assert data["marketing"]["funnel"]
+
+
+def test_password_is_stored_as_bcrypt_hash_not_plain_text():
+    from sqlalchemy import select
+
+    from backend.database import SessionLocal
+    from backend.models import User
+
+    username = "hash-check@example.com"
+    password = "StrongPass123!"
+
+    response = client.post("/api/v1/auth/register", json=register_payload(username, password))
+    assert response.status_code == 201
+
+    with SessionLocal() as db:
+        user = db.scalar(select(User).where(User.email == username))
+
+    assert user is not None
+    assert user.hashed_password != password
+    assert user.hashed_password.startswith("$2b$")
+
+
+def test_database_roles_permissions_and_me_routes_are_protected():
+    login_response = login("user@example.com", "Password123!")
+    assert login_response.status_code == 200
+    headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+
+    me_response = client.get("/api/v1/database/me", headers=headers)
+    assert me_response.status_code == 200
+    assert "Admin" in me_response.json()["roles"]
+    assert "orders.read" in me_response.json()["permissions"]
+
+    roles_response = client.get("/api/v1/database/roles", headers=headers)
+    permissions_response = client.get("/api/v1/database/permissions", headers=headers)
+
+    assert roles_response.status_code == 200
+    assert permissions_response.status_code == 200
+    assert any(role["name"] == "Admin" for role in roles_response.json())
+    assert any(permission["code"] == "audit.read" for permission in permissions_response.json())

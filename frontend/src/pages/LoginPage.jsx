@@ -238,7 +238,7 @@ export default function LoginPage({ onLogin }) {
   };
 
   return (
-    <main className="login-container auth-container legacy-auth-page">
+    <main className="login-container auth-container auth-page">
       <section className="auth-card">
         <form
           id="loginForm"

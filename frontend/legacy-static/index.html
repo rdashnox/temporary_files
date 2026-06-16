@@ -1,0 +1,121 @@
+<!--
+    FinMark authentication page.
+    Login is the default view. Users without an account can click "Create account".
+    Forgot-password is also available from the login card.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FinMark Login</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="login-container auth-container">
+        <section class="auth-card">
+            <form id="loginForm" class="login-form auth-form">
+                <h2>FinMark Login</h2>
+
+                <div class="form-group">
+                    <label for="loginUsername">Email:</label>
+                    <input type="email" id="loginUsername" name="username" autocomplete="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="loginPassword">Password:</label>
+                    <input type="password" id="loginPassword" name="password" autocomplete="current-password" required>
+                </div>
+
+                <button type="submit" data-default-label="Login" data-loading-label="Logging in...">
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <span class="button-label">Login</span>
+                </button>
+                <p id="loginMessage" class="message" role="status" aria-live="polite"></p>
+
+                <p class="auth-switch-text">
+                    <button type="button" id="showForgotPasswordButton" class="link-button">Forgot password?</button>
+                </p>
+
+                <p class="auth-switch-text">
+                    Don&apos;t have an account?
+                    <button type="button" id="showRegisterButton" class="link-button">Create account</button>
+                </p>
+            </form>
+
+            <form id="registerForm" class="login-form auth-form hidden" aria-hidden="true">
+                <h2>Create Account</h2>
+
+                <div class="form-group">
+                    <label for="registerUsername">Email:</label>
+                    <input type="email" id="registerUsername" name="username" autocomplete="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="registerPassword">Password:</label>
+                    <input type="password" id="registerPassword" name="password" autocomplete="new-password" required>
+                    <ul id="passwordRequirements" class="password-requirements" aria-live="polite">
+                        <li data-rule="length">At least 8 characters</li>
+                        <li data-rule="lowercase">One lowercase letter</li>
+                        <li data-rule="uppercase">One uppercase letter</li>
+                        <li data-rule="number">One number</li>
+                        <li data-rule="special">One special character</li>
+                    </ul>
+                </div>
+
+                <div class="form-group">
+                    <label for="registerConfirmPassword">Confirm Password:</label>
+                    <input type="password" id="registerConfirmPassword" name="confirm_password" autocomplete="new-password" required>
+                </div>
+
+                <button type="submit" data-default-label="Register" data-loading-label="Registering...">
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <span class="button-label">Register</span>
+                </button>
+                <p id="registerMessage" class="message" role="status" aria-live="polite"></p>
+
+                <div id="verificationDemoBox" class="demo-box hidden">
+                    <strong>Demo verification link:</strong>
+                    <p>In production, this link should be sent by email.</p>
+                    <a id="verificationDemoLink" href="#">Verify email now</a>
+                </div>
+
+                <p class="auth-switch-text">
+                    Already have an account?
+                    <button type="button" id="showLoginButton" class="link-button">Back to login</button>
+                </p>
+            </form>
+
+            <form id="forgotPasswordForm" class="login-form auth-form hidden" aria-hidden="true">
+                <h2>Forgot Password</h2>
+                <p class="form-hint">Enter your email to generate a reset link.</p>
+
+                <div class="form-group">
+                    <label for="forgotUsername">Email:</label>
+                    <input type="email" id="forgotUsername" name="username" autocomplete="email" required>
+                </div>
+
+                <button type="submit" data-default-label="Send reset link" data-loading-label="Sending...">
+                    <span class="button-spinner" aria-hidden="true"></span>
+                    <span class="button-label">Send reset link</span>
+                </button>
+                <p id="forgotMessage" class="message" role="status" aria-live="polite"></p>
+
+                <div id="resetDemoBox" class="demo-box hidden">
+                    <strong>Demo reset link:</strong>
+                    <p>In production, this link should be sent by email.</p>
+                    <a id="resetDemoLink" href="#">Reset password now</a>
+                </div>
+
+                <p class="auth-switch-text">
+                    <button type="button" id="backToLoginFromForgotButton" class="link-button">Back to login</button>
+                </p>
+            </form>
+        </section>
+    </main>
+
+    <script src="js/config.js"></script>
+    <script src="js/authGuard.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

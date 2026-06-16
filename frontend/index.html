@@ -1,32 +1,13 @@
-<!--
-    This is the main HTML file for the FinMark login page.
-    It contains the login form structure and links to CSS for styling and JavaScript for interactivity.
-    The HTML structure can be enhanced for better semantics and accessibility.
--->
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FinMark Login</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <div class="login-container">
-        <form id="loginForm" class="login-form">
-            <h2>FinMark Login</h2>
-            <div class="form-group">
-                <label for="username">Email:</label>
-                <input type="email" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password:</label>
-                <input type="password" id="password" name="password" required>
-            </div>
-            <button type="submit">Login</button>
-            <p id="message" class="message"></p>
-        </form>
-    </div>
-    <script src="script.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Ware Sync inspired React add-to-cart dashboard" />
+    <title>Ware Sync Cart Dashboard</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

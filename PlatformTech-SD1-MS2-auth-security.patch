@@ -1,0 +1,1158 @@
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/.env task2_project/PlatformTech-SD1-MS2/.env
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/.env	1970-01-01 00:00:00.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/.env	2026-06-11 02:43:43.218900682 +0000
+@@ -0,0 +1,5 @@
++# Development values only. Replace SECRET_KEY before production deployment.
++SECRET_KEY=replace-this-with-a-long-random-secret-key-for-production
++ALGORITHM=HS256
++ACCESS_TOKEN_EXPIRE_MINUTES=30
++FRONTEND_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/.env.example task2_project/PlatformTech-SD1-MS2/.env.example
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/.env.example	1970-01-01 00:00:00.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/.env.example	2026-06-11 02:43:43.242026975 +0000
+@@ -0,0 +1,5 @@
++# Copy this file to .env and replace the values as needed.
++SECRET_KEY=replace-this-with-a-long-random-secret-key-for-production
++ALGORITHM=HS256
++ACCESS_TOKEN_EXPIRE_MINUTES=30
++FRONTEND_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/README.md task2_project/PlatformTech-SD1-MS2/README.md
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/README.md	2026-06-11 02:31:22.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/README.md	2026-06-11 02:46:21.373770603 +0000
+@@ -1,86 +1,170 @@
+ # FinMark Prototype
+ 
+-This repository contains a functional prototype of a user login module for the FinMark project, developed as part of Milestone 2. It demonstrates a clean architecture with a Python FastAPI backend and a simple HTML/CSS/JavaScript frontend.
++This repository contains a functional prototype of a user authentication module for the FinMark project. It uses a Python FastAPI backend with a simple HTML/CSS/JavaScript frontend.
++
++## Implemented Features
++
++- User registration endpoint: `POST /api/v1/auth/register`
++- Login endpoint: `POST /api/v1/auth/token`
++- Password hashing with `passlib[bcrypt]`
++- Signed JWT access tokens using `python-jose`
++- Protected data route with bearer-token validation
++- Frontend login form with token storage and dashboard redirect
++- Frontend registration form
++- Dashboard logout button that removes `access_token`
++- `.env` support for secrets and runtime configuration
+ 
+ ## Project Structure
+ 
+-```
++```text
+ .
++├── .env                         # Local development secrets/configuration
++├── .env.example                 # Template for environment variables
++├── requirements.txt             # Backend dependencies
+ ├── backend/
+-│   ├── venv/                      # Python Virtual Environment
+-│   ├── main.py                    # Main FastAPI application
++│   ├── main.py                  # FastAPI application entry point
++│   ├── core/
++│   │   └── config.py            # .env-backed settings
+ │   ├── routes/
+-│   │   └── auth.py                # Authentication routes (e.g., /token)
++│   │   ├── auth.py              # Register and token routes
++│   │   └── data.py              # Protected data routes
+ │   ├── controllers/
+-│   │   └── auth_controller.py     # Authentication logic orchestration
++│   │   └── auth_controller.py   # Auth orchestration layer
+ │   └── services/
+-│       └── auth_service.py        # Core authentication business logic (dummy)
++│       └── auth_service.py      # Password hashing, login, JWT logic
+ └── frontend/
+-    ├── index.html                 # Main login page HTML
+-    ├── style.css                  # Styling for the login page
+-    └── script.js                  # Frontend JavaScript for form submission and API calls
++    ├── index.html               # Login and registration page
++    ├── style.css                # Auth page styling
++    ├── script.js                # Login/register API calls
++    ├── dashboard.html           # Protected dashboard placeholder
++    └── dashboard.css            # Dashboard styling
+ ```
+ 
+ ## How to Run the Prototype
+ 
+-Follow these steps to get the FinMark Login Prototype running on your local machine.
+-
+ ### 1. Start the Backend
+ 
+-1.  **Navigate to the project root directory** — the folder that contains `backend/` and `frontend/`.
+-2.  **Create or activate your Python virtual environment, then install dependencies:**
+-    ```bash
+-    pip install -r requirements.txt
+-    ```
+-3.  **Run the FastAPI application from the project root:**
+-    ```bash
+-    python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+-    ```
+-    This will start the backend server, typically accessible at `http://localhost:8000`.
+-
+-### 2. Open the Frontend
+-
+-1.  **Navigate to the frontend directory:**
+-    ```bash
+-    cd "frontend"
+-    ```
+-2.  **Serve the frontend on port 8080:**
+-    ```bash
+-    python -m http.server 8080
+-    ```
+-3.  **Open the frontend in your browser:**
+-    ```text
+-    http://localhost:8080
+-    ```
+-    This matches the CORS origins configured in `backend/main.py`.
+-
+-### 3. Test the Login
+-
+-Use the following dummy credentials for testing:
+-
+-*   **Email:** `user@example.com`
+-*   **Password:** `password123`
+-
+-1.  Enter these credentials into the login form.
+-2.  Click the "Login" button.
+-3.  You should see a "Login successful! Token: fake-jwt-token" message below the form. If login fails (e.g., incorrect credentials), an error message will be displayed.
+-
+-## Key Design Decisions
+-
+-*   **Clean Architecture:** Backend structured into routes, controllers, and services for clear separation of concerns, maintainability, and scalability.
+-*   **Python FastAPI Backend:** Chosen for its high performance, ease of use, and alignment with the project's architectural discussions.
+-*   **HTML/CSS/JS Frontend:** A simple, direct approach for the frontend to quickly demonstrate functionality without the overhead of a full frontend framework, while using essential web technologies.
+-*   **CORS Enabled:** The FastAPI backend is configured to allow requests from the frontend running locally, preventing common cross-origin issues.
+-*   **Dummy Authentication:** Credentials are hardcoded in the `auth_service.py` for demonstration purposes. In a real application, this would interact with a database and securely hash passwords.
+-*   **Fake JWT Token:** A placeholder token is returned to simulate successful authentication and session management.
+-
+-## Next Steps
+-
+-This prototype provides a foundational login module. Future enhancements would include:
+-
+-*   Database integration for user management.
+-*   Proper JWT generation, validation, and session handling.
+-*   User registration and password reset functionality.
+-*   Integration with the broader FinMark dashboard and services.
+-*   Robust error handling and input validation.
+-*   Deployment to a containerized environment (e.g., Docker, Kubernetes).
++Run these commands from the project root directory, the folder that contains `backend/` and `frontend/`.
++
++```bash
++python -m venv .venv
++```
++
++On Windows PowerShell:
++
++```powershell
++Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
++.\.venv\Scripts\Activate.ps1
++```
++
++On macOS/Linux:
++
++```bash
++source .venv/bin/activate
++```
++
++Install dependencies:
++
++```bash
++pip install -r requirements.txt
++```
++
++Run the backend from the project root:
++
++```bash
++python -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
++```
++
++The backend will be available at:
++
++```text
++http://localhost:8000
++```
++
++API docs will be available at:
++
++```text
++http://localhost:8000/docs
++```
++
++### 2. Start the Frontend
++
++Open another terminal, then run:
++
++```bash
++cd frontend
++python -m http.server 8080
++```
++
++Open this in your browser:
++
++```text
++http://localhost:8080
++```
++
++This matches the allowed frontend origins configured in `.env`.
++
++## Environment Variables
++
++The project includes a development `.env` file and `.env.example` template.
++
++```env
++SECRET_KEY=replace-this-with-a-long-random-secret-key-for-production
++ALGORITHM=HS256
++ACCESS_TOKEN_EXPIRE_MINUTES=30
++FRONTEND_ORIGINS=http://localhost:8080,http://127.0.0.1:8080
++```
++
++For real deployment, replace `SECRET_KEY` with a long random secret and do not commit production secrets.
++
++## Test Credentials
++
++A demo user is seeded when the backend starts:
++
++```text
++Email: user@example.com
++Password: password123
++```
++
++The password is stored as a bcrypt hash, not plain text.
++
++## Manual API Testing
++
++### Register
++
++```bash
++curl -X POST http://localhost:8000/api/v1/auth/register \
++  -H "Content-Type: application/json" \
++  -d '{"username":"newuser@example.com","password":"securepass123"}'
++```
++
++### Login
++
++```bash
++curl -X POST http://localhost:8000/api/v1/auth/token \
++  -H "Content-Type: application/x-www-form-urlencoded" \
++  -d "username=newuser@example.com&password=securepass123"
++```
++
++### Access Protected Route
++
++Replace `<TOKEN>` with the access token returned by login.
++
++```bash
++curl http://localhost:8000/api/v1/data/protected \
++  -H "Authorization: Bearer <TOKEN>"
++```
++
++## Security Notes
++
++This is still a prototype. It now uses bcrypt password hashing and signed JWTs, but registered users are still stored in memory. Users disappear when the backend restarts.
++
++For production, the next important upgrades are:
++
++- Store users in a database.
++- Add proper user schema validation and duplicate-email checks at the database level.
++- Add refresh tokens or secure session management.
++- Prefer HttpOnly, Secure, SameSite cookies over `localStorage` for sensitive tokens.
++- Add rate limiting for login and registration.
++- Add password reset and email verification.
++- Add automated tests.
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/backend/controllers/auth_controller.py task2_project/PlatformTech-SD1-MS2/backend/controllers/auth_controller.py
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/backend/controllers/auth_controller.py	2026-06-11 02:30:07.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/backend/controllers/auth_controller.py	2026-06-11 02:43:40.104727400 +0000
+@@ -3,18 +3,28 @@
+ 
+ def authenticate_user(username: str, password: str):
+     """
+-    Authenticates a user by calling the authentication service and generates an access token.
++    Authenticate a user and return a signed JWT access token.
+     """
+     user = auth_service.verify_login(username, password)
+     if not user:
+-        return False  # Authentication failed
++        return False
+ 
+-    token = auth_service.create_access_token(user["username"])
+-    return token  # Authentication successful, return the token
++    return auth_service.create_access_token(user["username"])
+ 
+ 
+ def register_new_user(username: str, password: str):
+     """
+-    Registers a new user by calling the authentication service.
++    Register a new user by calling the authentication service.
+     """
+     return auth_service.register_user(username, password)
++
++
++def get_current_user_from_token(token: str):
++    """
++    Validate a JWT token and return the authenticated user.
++    """
++    payload = auth_service.decode_access_token(token)
++    if not payload:
++        return None
++
++    return auth_service.get_user_by_username(payload["sub"])
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/backend/core/config.py task2_project/PlatformTech-SD1-MS2/backend/core/config.py
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/backend/core/config.py	1970-01-01 00:00:00.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/backend/core/config.py	2026-06-11 02:43:40.055775128 +0000
+@@ -0,0 +1,54 @@
++import os
++from dataclasses import dataclass
++from functools import lru_cache
++from pathlib import Path
++from typing import List
++
++from dotenv import load_dotenv
++
++# Load the project-level .env file regardless of where uvicorn is started.
++PROJECT_ROOT = Path(__file__).resolve().parents[2]
++load_dotenv(PROJECT_ROOT / ".env")
++
++
++def _get_int_env(name: str, default: int) -> int:
++    raw_value = os.getenv(name)
++    if raw_value is None:
++        return default
++
++    try:
++        return int(raw_value)
++    except ValueError:
++        return default
++
++
++def _get_list_env(name: str, default: str) -> List[str]:
++    raw_value = os.getenv(name, default)
++    return [item.strip() for item in raw_value.split(",") if item.strip()]
++
++
++@dataclass(frozen=True)
++class Settings:
++    secret_key: str
++    algorithm: str
++    access_token_expire_minutes: int
++    frontend_origins: List[str]
++
++
++@lru_cache
++def get_settings() -> Settings:
++    return Settings(
++        secret_key=os.getenv(
++            "SECRET_KEY",
++            "change-this-development-secret-key-before-production-use",
++        ),
++        algorithm=os.getenv("ALGORITHM", "HS256"),
++        access_token_expire_minutes=_get_int_env("ACCESS_TOKEN_EXPIRE_MINUTES", 30),
++        frontend_origins=_get_list_env(
++            "FRONTEND_ORIGINS",
++            "http://localhost:8080,http://127.0.0.1:8080",
++        ),
++    )
++
++
++settings = get_settings()
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/backend/main.py task2_project/PlatformTech-SD1-MS2/backend/main.py
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/backend/main.py	2026-06-11 02:15:29.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/backend/main.py	2026-06-11 02:43:42.925861511 +0000
+@@ -1,33 +1,30 @@
+-from fastapi import FastAPI
+-from fastapi.middleware.cors import CORSMiddleware
+-from .routes import auth
+-from .routes import data
+-
+-app = FastAPI()
+-
+-# Configure CORS (Cross-Origin Resource Sharing)
+-# This allows the frontend application (e.g., running on localhost:8080)
+-# to make requests to this backend API.
+-origins = [
+-    "http://localhost:8080",  # Frontend development server
+-    "http://127.0.0.1:8080",
+-    # Add other origins as needed for deployment or different frontend URLs
+-]
+-
+-app.add_middleware(
+-    CORSMiddleware,
+-    allow_origins=origins,
+-    allow_credentials=True,
+-    allow_methods=["*"],
+-    allow_headers=["*"],
+-)
+-
+-# Include API routers
+-# Routes for authentication (login, registration)
+-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+-# Routes for protected data
+-app.include_router(data.router, prefix="/api/v1/data", tags=["data"])
+-
+-@app.get("/")
+-async def read_root():
+-    return {"message": "Welcome to FinMark Backend API"}
++from fastapi import FastAPI
++from fastapi.middleware.cors import CORSMiddleware
++from .core.config import settings
++from .routes import auth
++from .routes import data
++
++app = FastAPI()
++
++# Configure CORS (Cross-Origin Resource Sharing)
++# This allows the frontend application (e.g., running on localhost:8080)
++# to make requests to this backend API.
++origins = settings.frontend_origins
++
++app.add_middleware(
++    CORSMiddleware,
++    allow_origins=origins,
++    allow_credentials=True,
++    allow_methods=["*"],
++    allow_headers=["*"],
++)
++
++# Include API routers
++# Routes for authentication (login, registration)
++app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
++# Routes for protected data
++app.include_router(data.router, prefix="/api/v1/data", tags=["data"])
++
++@app.get("/")
++async def read_root():
++    return {"message": "Welcome to FinMark Backend API"}
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/backend/routes/data.py task2_project/PlatformTech-SD1-MS2/backend/routes/data.py
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/backend/routes/data.py	2026-06-11 01:49:50.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/backend/routes/data.py	2026-06-11 02:43:40.145463379 +0000
+@@ -1,16 +1,34 @@
+-from fastapi import APIRouter, Depends, HTTPException, status
+-from fastapi.security import OAuth2PasswordBearer
+-
+-router = APIRouter()
+-
+-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+-
+-@router.get("/protected")
+-async def read_protected_data(token: str = Depends(oauth2_scheme)):
+-    """
+-    Retrieves protected data, requiring a valid authentication token.
+-    The presence of any token in the Authorization header grants access for this prototype.
+-    """
+-    # For a real application, token validation (e.g., JWT signature, expiration)
+-    # would be implemented here or in a dependency.
+-    return {"message": "This is protected data!", "your_token_was": token}
++from fastapi import APIRouter, Depends, HTTPException, status
++from fastapi.security import OAuth2PasswordBearer
++
++from ..controllers import auth_controller
++
++router = APIRouter()
++
++oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
++
++
++async def get_current_user(token: str = Depends(oauth2_scheme)):
++    """
++    Validate the bearer token and return the current user.
++    """
++    user = auth_controller.get_current_user_from_token(token)
++    if not user:
++        raise HTTPException(
++            status_code=status.HTTP_401_UNAUTHORIZED,
++            detail="Invalid or expired access token",
++            headers={"WWW-Authenticate": "Bearer"},
++        )
++
++    return user
++
++
++@router.get("/protected")
++async def read_protected_data(current_user: dict = Depends(get_current_user)):
++    """
++    Retrieves protected data, requiring a valid signed JWT access token.
++    """
++    return {
++        "message": "This is protected data!",
++        "authenticated_user": current_user["username"],
++    }
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/backend/services/auth_service.py task2_project/PlatformTech-SD1-MS2/backend/services/auth_service.py
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/backend/services/auth_service.py	2026-06-11 02:30:07.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/backend/services/auth_service.py	2026-06-11 02:43:40.081589907 +0000
+@@ -1,58 +1,125 @@
+-import base64
+-import json
+ from datetime import datetime, timedelta, timezone
++from typing import Optional
++
++from jose import JWTError, jwt
++from passlib.context import CryptContext
++
++from ..core.config import settings
++
++pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+ 
+ # Initial in-memory store of users for demonstration purposes.
+-# In a real application, this would be a database.
+-_IN_MEMORY_USERS = {
+-    "user@example.com": {"username": "user@example.com", "password": "password123"}
+-}
++# In a real application, this should be replaced with a database table.
++_IN_MEMORY_USERS = {}
++
++
++def _normalize_username(username: str) -> str:
++    return username.strip().lower()
++
++
++def hash_password(password: str) -> str:
++    """Hash a plain-text password using bcrypt."""
++    return pwd_context.hash(password)
++
+ 
++def verify_password(plain_password: str, hashed_password: str) -> bool:
++    """Verify a plain password against a bcrypt hash."""
++    return pwd_context.verify(plain_password, hashed_password)
+ 
+-def verify_login(username: str, password: str):
++
++def _seed_demo_user() -> None:
++    """Create a demo user without storing a plain-text password."""
++    demo_username = "user@example.com"
++    if demo_username not in _IN_MEMORY_USERS:
++        _IN_MEMORY_USERS[demo_username] = {
++            "username": demo_username,
++            "hashed_password": hash_password("password123"),
++        }
++
++
++_seed_demo_user()
++
++
++def verify_login(username: str, password: str) -> Optional[dict]:
+     """
+-    Verifies user credentials against the in-memory user store.
++    Verify user credentials against the in-memory user store.
++    Passwords are checked using bcrypt hashes, not plain-text comparison.
+     """
+-    normalized_username = username.strip().lower()
++    normalized_username = _normalize_username(username)
+     user = _IN_MEMORY_USERS.get(normalized_username)
+-    if user and user["password"] == password:
+-        return user
+-    return None
+ 
++    if not user:
++        return None
+ 
+-def register_user(username: str, password: str):
+-    """
+-    Registers a new user in the in-memory store.
++    if not verify_password(password, user["hashed_password"]):
++        return None
++
++    return {"username": user["username"]}
+ 
+-    Note: This prototype stores plain text passwords only for demonstration.
+-    A production implementation must hash passwords before saving them.
++
++def register_user(username: str, password: str) -> dict:
++    """
++    Register a new user in the in-memory store with a bcrypt-hashed password.
+     """
+-    normalized_username = username.strip().lower()
++    normalized_username = _normalize_username(username)
+ 
+     if normalized_username in _IN_MEMORY_USERS:
+         raise ValueError("User already exists")
+ 
+     _IN_MEMORY_USERS[normalized_username] = {
+         "username": normalized_username,
+-        "password": password,
++        "hashed_password": hash_password(password),
+     }
+ 
+-    # Do not return the password to controllers/routes.
++    # Do not return password hashes to controllers/routes.
+     return {"username": normalized_username}
+ 
+ 
+-def create_access_token(username: str):
++def create_access_token(username: str) -> str:
+     """
+-    Generates a structured, but non-cryptographically signed, JWT-like string.
+-
+-    This is for demonstration only. It is not a secure JWT because it is not signed.
++    Create a signed JWT access token using python-jose.
+     """
+-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=30)
++    expires_at = datetime.now(timezone.utc) + timedelta(
++        minutes=settings.access_token_expire_minutes
++    )
+     claims = {
+-        "sub": username,
+-        "exp": int(expires_at.timestamp()),
++        "sub": _normalize_username(username),
++        "exp": expires_at,
+         "type": "access",
+     }
+ 
+-    token_payload = json.dumps(claims, separators=(",", ":")).encode("utf-8")
+-    return base64.urlsafe_b64encode(token_payload).decode("utf-8").rstrip("=")
++    return jwt.encode(claims, settings.secret_key, algorithm=settings.algorithm)
++
++
++def decode_access_token(token: str) -> Optional[dict]:
++    """
++    Decode and validate a signed JWT access token.
++    Returns token claims if valid, otherwise None.
++    """
++    try:
++        payload = jwt.decode(
++            token,
++            settings.secret_key,
++            algorithms=[settings.algorithm],
++        )
++    except JWTError:
++        return None
++
++    username = payload.get("sub")
++    token_type = payload.get("type")
++
++    if not username or token_type != "access":
++        return None
++
++    return payload
++
++
++def get_user_by_username(username: str) -> Optional[dict]:
++    """Return safe user data for an existing username."""
++    normalized_username = _normalize_username(username)
++    user = _IN_MEMORY_USERS.get(normalized_username)
++
++    if not user:
++        return None
++
++    return {"username": user["username"]}
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/dashboard.html task2_project/PlatformTech-SD1-MS2/frontend/dashboard.html
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/dashboard.html	2026-06-11 01:49:50.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/frontend/dashboard.html	2026-06-11 02:44:06.474492187 +0000
+@@ -1,22 +1,38 @@
+-<!--
+-    This is the dashboard page, displayed after successful user login.
+-    It should contain a prominent welcome message and a placeholder for a logout button.
+-    The content and styling of this page can be further developed.
+--->
+-<!DOCTYPE html>
+-<html lang="en">
+-<head>
+-    <meta charset="UTF-8">
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>FinMark Dashboard</title>
+-    <link rel="stylesheet" href="dashboard.css"> <!-- Link to optional dashboard styling -->
+-</head>
+-<body>
+-    <div class="dashboard-container">
+-        <h1>Welcome to the FinMark Dashboard!</h1>
+-        <p>You have successfully logged in.</p>
+-        <p>This is a placeholder for your secure content.</p>
+-        <button id="logoutButton">Logout</button>
+-    </div>
+-</body>
+-</html>
++<!--
++    FinMark dashboard page.
++    Includes a logout script that removes the stored access token.
++-->
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>FinMark Dashboard</title>
++    <link rel="stylesheet" href="dashboard.css">
++</head>
++<body>
++    <div class="dashboard-container">
++        <h1>Welcome to the FinMark Dashboard!</h1>
++        <p>You have successfully logged in.</p>
++        <p>This is a placeholder for your secure content.</p>
++        <button id="logoutButton">Logout</button>
++    </div>
++
++    <script>
++        document.addEventListener('DOMContentLoaded', () => {
++            const TOKEN_STORAGE_KEY = 'access_token';
++            const token = localStorage.getItem(TOKEN_STORAGE_KEY);
++
++            if (!token) {
++                window.location.replace('index.html');
++                return;
++            }
++
++            document.getElementById('logoutButton').addEventListener('click', () => {
++                localStorage.removeItem(TOKEN_STORAGE_KEY);
++                window.location.replace('index.html');
++            });
++        });
++    </script>
++</body>
++</html>
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/index.html task2_project/PlatformTech-SD1-MS2/frontend/index.html
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/index.html	2026-06-11 01:49:50.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/frontend/index.html	2026-06-11 02:44:06.422639894 +0000
+@@ -1,32 +1,49 @@
+-<!--
+-    This is the main HTML file for the FinMark login page.
+-    It contains the login form structure and links to CSS for styling and JavaScript for interactivity.
+-    The HTML structure can be enhanced for better semantics and accessibility.
+--->
+-<!DOCTYPE html>
+-<html lang="en">
+-<head>
+-    <meta charset="UTF-8">
+-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>FinMark Login</title>
+-    <link rel="stylesheet" href="style.css">
+-</head>
+-<body>
+-    <div class="login-container">
+-        <form id="loginForm" class="login-form">
+-            <h2>FinMark Login</h2>
+-            <div class="form-group">
+-                <label for="username">Email:</label>
+-                <input type="email" id="username" name="username" required>
+-            </div>
+-            <div class="form-group">
+-                <label for="password">Password:</label>
+-                <input type="password" id="password" name="password" required>
+-            </div>
+-            <button type="submit">Login</button>
+-            <p id="message" class="message"></p>
+-        </form>
+-    </div>
+-    <script src="script.js"></script>
+-</body>
+-</html>
++<!--
++    FinMark authentication page.
++    Includes login and registration forms that call the FastAPI backend.
++-->
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="UTF-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1.0">
++    <title>FinMark Authentication</title>
++    <link rel="stylesheet" href="style.css">
++</head>
++<body>
++    <div class="login-container auth-container">
++        <section class="auth-card">
++            <form id="loginForm" class="login-form auth-form">
++                <h2>FinMark Login</h2>
++                <div class="form-group">
++                    <label for="loginUsername">Email:</label>
++                    <input type="email" id="loginUsername" name="username" autocomplete="email" required>
++                </div>
++                <div class="form-group">
++                    <label for="loginPassword">Password:</label>
++                    <input type="password" id="loginPassword" name="password" autocomplete="current-password" required>
++                </div>
++                <button type="submit">Login</button>
++                <p id="loginMessage" class="message"></p>
++            </form>
++        </section>
++
++        <section class="auth-card">
++            <form id="registerForm" class="login-form auth-form">
++                <h2>Create Account</h2>
++                <div class="form-group">
++                    <label for="registerUsername">Email:</label>
++                    <input type="email" id="registerUsername" name="username" autocomplete="email" required>
++                </div>
++                <div class="form-group">
++                    <label for="registerPassword">Password:</label>
++                    <input type="password" id="registerPassword" name="password" autocomplete="new-password" required>
++                </div>
++                <button type="submit">Register</button>
++                <p id="registerMessage" class="message"></p>
++            </form>
++        </section>
++    </div>
++    <script src="script.js"></script>
++</body>
++</html>
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/script.js task2_project/PlatformTech-SD1-MS2/frontend/script.js
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/script.js	2026-06-11 02:30:21.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/frontend/script.js	2026-06-11 02:44:06.445851134 +0000
+@@ -1,42 +1,65 @@
+ document.addEventListener('DOMContentLoaded', () => {
+-    const API_LOGIN_URL = 'http://localhost:8000/api/v1/auth/token';
++    const API_BASE_URL = 'http://localhost:8000/api/v1/auth';
++    const API_LOGIN_URL = `${API_BASE_URL}/token`;
++    const API_REGISTER_URL = `${API_BASE_URL}/register`;
+     const TOKEN_STORAGE_KEY = 'access_token';
+ 
+     const loginForm = document.getElementById('loginForm');
+-    const messageElement = document.getElementById('message');
+-    const submitButton = loginForm.querySelector('button[type="submit"]');
+-
+-    const showMessage = (message, type = 'error') => {
+-        messageElement.textContent = message;
+-        messageElement.className = `message ${type}`;
++    const registerForm = document.getElementById('registerForm');
++    const loginMessageElement = document.getElementById('loginMessage');
++    const registerMessageElement = document.getElementById('registerMessage');
++
++    const showMessage = (element, message, type = 'error') => {
++        element.textContent = message;
++        element.className = `message ${type}`;
+     };
+ 
+-    loginForm.addEventListener('submit', async (event) => {
+-        event.preventDefault();
+-
+-        const username = document.getElementById('username').value.trim();
+-        const password = document.getElementById('password').value;
++    const clearMessage = (element) => {
++        element.textContent = '';
++        element.className = 'message';
++    };
+ 
+-        messageElement.textContent = '';
+-        messageElement.className = 'message';
++    const isValidEmail = (email) => /\S+@\S+\.\S+/.test(email);
+ 
++    const validateCredentials = (username, password, messageElement) => {
+         if (!username) {
+-            showMessage('Email cannot be empty.');
+-            return;
++            showMessage(messageElement, 'Email cannot be empty.');
++            return false;
+         }
+ 
+-        if (!/\S+@\S+\.\S+/.test(username)) {
+-            showMessage('Please enter a valid email address.');
+-            return;
++        if (!isValidEmail(username)) {
++            showMessage(messageElement, 'Please enter a valid email address.');
++            return false;
+         }
+ 
+         if (!password.trim()) {
+-            showMessage('Password cannot be empty.');
+-            return;
++            showMessage(messageElement, 'Password cannot be empty.');
++            return false;
+         }
+ 
+         if (password.length < 8) {
+-            showMessage('Password must be at least 8 characters long.');
++            showMessage(messageElement, 'Password must be at least 8 characters long.');
++            return false;
++        }
++
++        return true;
++    };
++
++    const setButtonLoading = (button, isLoading, loadingText, defaultText) => {
++        button.disabled = isLoading;
++        button.textContent = isLoading ? loadingText : defaultText;
++    };
++
++    loginForm.addEventListener('submit', async (event) => {
++        event.preventDefault();
++
++        const username = document.getElementById('loginUsername').value.trim();
++        const password = document.getElementById('loginPassword').value;
++        const submitButton = loginForm.querySelector('button[type="submit"]');
++
++        clearMessage(loginMessageElement);
++
++        if (!validateCredentials(username, password, loginMessageElement)) {
+             return;
+         }
+ 
+@@ -44,8 +67,7 @@
+         formData.append('username', username);
+         formData.append('password', password);
+ 
+-        submitButton.disabled = true;
+-        submitButton.textContent = 'Logging in...';
++        setButtonLoading(submitButton, true, 'Logging in...', 'Login');
+ 
+         try {
+             const response = await fetch(API_LOGIN_URL, {
+@@ -59,24 +81,65 @@
+             const data = await response.json();
+ 
+             if (!response.ok) {
+-                showMessage(`Login failed: ${data.detail || 'Invalid credentials.'}`);
++                showMessage(loginMessageElement, `Login failed: ${data.detail || 'Invalid credentials.'}`);
+                 return;
+             }
+ 
+             if (!data.access_token) {
+-                showMessage('Login failed: backend did not return an access token.');
++                showMessage(loginMessageElement, 'Login failed: backend did not return an access token.');
+                 return;
+             }
+ 
+-            // Required by FE Task 4: persist token after successful login, then redirect.
++            // FE Task 4: persist token after successful login, then redirect.
+             localStorage.setItem(TOKEN_STORAGE_KEY, data.access_token);
+             window.location.assign('dashboard.html');
+         } catch (error) {
+-            showMessage('Unable to connect to the backend. Please make sure the API server is running.');
+-            console.error('Network or unexpected error:', error);
++            showMessage(loginMessageElement, 'Unable to connect to the backend. Please make sure the API server is running.');
++            console.error('Login error:', error);
++        } finally {
++            setButtonLoading(submitButton, false, 'Logging in...', 'Login');
++        }
++    });
++
++    registerForm.addEventListener('submit', async (event) => {
++        event.preventDefault();
++
++        const username = document.getElementById('registerUsername').value.trim();
++        const password = document.getElementById('registerPassword').value;
++        const submitButton = registerForm.querySelector('button[type="submit"]');
++
++        clearMessage(registerMessageElement);
++
++        if (!validateCredentials(username, password, registerMessageElement)) {
++            return;
++        }
++
++        setButtonLoading(submitButton, true, 'Registering...', 'Register');
++
++        try {
++            const response = await fetch(API_REGISTER_URL, {
++                method: 'POST',
++                headers: {
++                    'Content-Type': 'application/json',
++                },
++                body: JSON.stringify({ username, password }),
++            });
++
++            const data = await response.json();
++
++            if (!response.ok) {
++                showMessage(registerMessageElement, `Registration failed: ${data.detail || 'Unable to create account.'}`);
++                return;
++            }
++
++            registerForm.reset();
++            document.getElementById('loginUsername').value = username;
++            showMessage(registerMessageElement, 'Registration successful. You may now log in.', 'success');
++        } catch (error) {
++            showMessage(registerMessageElement, 'Unable to connect to the backend. Please make sure the API server is running.');
++            console.error('Registration error:', error);
+         } finally {
+-            submitButton.disabled = false;
+-            submitButton.textContent = 'Login';
++            setButtonLoading(submitButton, false, 'Registering...', 'Register');
+         }
+     });
+ });
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/style.css task2_project/PlatformTech-SD1-MS2/frontend/style.css
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/frontend/style.css	2026-06-11 01:49:50.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/frontend/style.css	2026-06-11 02:44:25.396129081 +0000
+@@ -1,76 +1,106 @@
+-/*
+-    This CSS file is for styling the FinMark login page.
+-    Enhance the visual design to be modern, professional, and responsive.
+-    Consider FinMark's (imagined) brand identity for colors, typography, and layout.
+-*/
+-body {
+-    font-family: Arial, sans-serif;
+-    background-color: #f4f4f4;
+-    display: flex;
+-    justify-content: center;
+-    align-items: center;
+-    min-height: 100vh;
+-    margin: 0;
+-}
+-
+-.login-container {
+-    background-color: #fff;
+-    padding: 30px;
+-    border-radius: 8px;
+-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+-    width: 350px;
+-}
+-
+-.login-form h2 {
+-    text-align: center;
+-    margin-bottom: 20px;
+-    color: #333;
+-}
+-
+-.form-group {
+-    margin-bottom: 15px;
+-}
+-
+-.form-group label {
+-    display: block;
+-    margin-bottom: 5px;
+-    color: #555;
+-}
+-
+-.form-group input[type="email"],
+-.form-group input[type="password"] {
+-    width: 100%;
+-    padding: 10px;
+-    border: 1px solid #ddd;
+-    border-radius: 4px;
+-    box-sizing: border-box;
+-}
+-
+-button[type="submit"] {
+-    width: 100%;
+-    padding: 10px;
+-    background-color: #007bff;
+-    color: white;
+-    border: none;
+-    border-radius: 4px;
+-    cursor: pointer;
+-    font-size: 16px;
+-}
+-
+-button[type="submit"]:hover {
+-    background-color: #0056b3;
+-}
+-
+-.message {
+-    text-align: center;
+-    margin-top: 15px;
+-    font-weight: bold;
+-}
+-
+-.message.error {
+-    color: #dc3545;
+-}
+-
+-.message.success {
+-    color: #28a745;
+-}
++/*
++    Styling for the FinMark authentication page.
++*/
++body {
++    font-family: Arial, sans-serif;
++    background-color: #f4f4f4;
++    display: flex;
++    justify-content: center;
++    align-items: center;
++    min-height: 100vh;
++    margin: 0;
++    padding: 24px;
++    box-sizing: border-box;
++}
++
++.login-container {
++    background-color: #fff;
++    padding: 30px;
++    border-radius: 8px;
++    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
++    width: 350px;
++}
++
++.auth-container {
++    background-color: transparent;
++    box-shadow: none;
++    display: grid;
++    grid-template-columns: repeat(2, minmax(300px, 380px));
++    gap: 24px;
++    max-width: 840px;
++    width: 100%;
++    padding: 0;
++}
++
++.auth-card {
++    background-color: #fff;
++    padding: 30px;
++    border-radius: 8px;
++    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
++}
++
++.login-form h2 {
++    text-align: center;
++    margin-bottom: 20px;
++    color: #333;
++}
++
++.form-group {
++    margin-bottom: 15px;
++}
++
++.form-group label {
++    display: block;
++    margin-bottom: 5px;
++    color: #555;
++}
++
++.form-group input[type="email"],
++.form-group input[type="password"] {
++    width: 100%;
++    padding: 10px;
++    border: 1px solid #ddd;
++    border-radius: 4px;
++    box-sizing: border-box;
++}
++
++button[type="submit"] {
++    width: 100%;
++    padding: 10px;
++    background-color: #007bff;
++    color: white;
++    border: none;
++    border-radius: 4px;
++    cursor: pointer;
++    font-size: 16px;
++}
++
++button[type="submit"]:hover:not(:disabled) {
++    background-color: #0056b3;
++}
++
++button[type="submit"]:disabled {
++    background-color: #7aaee6;
++    cursor: not-allowed;
++}
++
++.message {
++    text-align: center;
++    margin-top: 15px;
++    min-height: 20px;
++    font-weight: bold;
++}
++
++.message.error {
++    color: #dc3545;
++}
++
++.message.success {
++    color: #28a745;
++}
++
++@media (max-width: 760px) {
++    .auth-container {
++        grid-template-columns: 1fr;
++    }
++}
+diff -ruN fixed_base_for_diff/PlatformTech-SD1-MS2/requirements.txt task2_project/PlatformTech-SD1-MS2/requirements.txt
+--- fixed_base_for_diff/PlatformTech-SD1-MS2/requirements.txt	2026-06-11 02:31:19.000000000 +0000
++++ task2_project/PlatformTech-SD1-MS2/requirements.txt	2026-06-11 02:45:57.244526614 +0000
+@@ -1,3 +1,7 @@
+-fastapi
+-uvicorn[standard]
+-python-multipart
++fastapi==0.115.6
++uvicorn[standard]==0.34.0
++python-multipart==0.0.20
++python-dotenv==1.0.1
++passlib[bcrypt]==1.7.4
++bcrypt==4.0.1
++python-jose[cryptography]==3.3.0

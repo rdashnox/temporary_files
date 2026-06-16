@@ -1,84 +1,251 @@
+# PlatformTech SD1 MS2 - React Dashboard Final Fetch Fix
+
+This version fixes the login `Failed to fetch` issue by using a Vite proxy. The frontend no longer directly calls `http://127.0.0.1:8000`; it calls `/api/v1`, and Vite forwards API requests to FastAPI.
+
+## Fastest Windows run
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+.\start-dev.ps1
+```
+
+Then open:
+
+```text
+http://127.0.0.1:5173
+```
+
+Confirm backend:
+
+```text
+http://127.0.0.1:8000/api/v1/health
+```
+
+---
+
 # FinMark Prototype
 
-This repository contains a functional prototype of a user login module for the FinMark project, developed as part of Milestone 2. It demonstrates a clean architecture with a Python FastAPI backend and a simple HTML/CSS/JavaScript frontend.
+FinMark is a FastAPI + React prototype for authenticated commerce workflows. The latest version includes a protected **React add-to-cart dashboard** with product listing, cart quantity controls, checkout form, coupon calculation, tax/shipping estimate, and FastAPI checkout confirmation.
+
+## Latest Upgrade
+
+
+### Ware Sync-Inspired Dashboard UI
+
+The active React dashboard was redesigned from the uploaded Ware Sync-style reference image. The new UI includes:
+
+- Light warm dashboard theme
+- Fixed rounded sidebar
+- Orange primary action buttons
+- Search bar, low-stock pill, notification button, and profile chip
+- KPI cards with mini bar charts
+- Purple countdown card
+- Product cards styled like the reference worker cards
+- Stock status pills and segmented stock progress bars
+- Right-side activity feed
+- Cart and checkout panel integrated into the right rail
+
+Additional design analysis is documented in:
+
+```text
+SCREENSHOT_UI_ANALYSIS.md
+```
+
+### React Add-to-Cart Dashboard
+
+The old static frontend was moved into:
+
+```text
+frontend/legacy-static/
+```
+
+The active frontend is now a Vite React app:
+
+```text
+frontend/
+├── package.json
+├── index.html
+└── src/
+    ├── App.jsx
+    ├── main.jsx
+    ├── styles.css
+    ├── api/
+    │   └── client.js
+    ├── components/
+    │   ├── CartPanel.jsx
+    │   ├── ProductCard.jsx
+    │   └── StatCard.jsx
+    └── pages/
+        ├── CartDashboard.jsx
+        └── LoginPage.jsx
+```
+
+### New Protected Shop API
+
+The backend now includes:
+
+```text
+GET  /api/v1/shop/products
+POST /api/v1/shop/checkout
+```
+
+Both endpoints require a valid bearer token. The React app logs in through the existing auth endpoint, stores the token, loads products from FastAPI, and submits checkout orders to FastAPI.
+
+The checkout endpoint validates:
+
+- Product existence
+- Product stock
+- Cart quantity
+- Customer name
+- Delivery address
+- Coupon code `SAVE10`
+- Shipping rule: free shipping when subtotal is at least ₱3,000
+- Demo VAT/tax calculation: 12%
+
+## Implemented Features
+
+- User login endpoint: `POST /api/v1/auth/token`
+- User registration endpoint: `POST /api/v1/auth/register`
+- Confirm-password validation during registration
+- Frontend and backend password strength validation
+- Email verification before login
+- Forgot-password and reset-password flow
+- Password hashing with `passlib[bcrypt]`
+- Signed JWT access and refresh tokens using `python-jose`
+- Refresh token endpoint: `POST /api/v1/auth/refresh`
+- Protected data route with bearer-token validation
+- Protected product catalog route
+- Protected checkout route
+- React login page
+- React add-to-cart dashboard
+- Product search and category filtering
+- Cart quantity increment/decrement
+- Cart clearing
+- Checkout form
+- Coupon code support
+- Order confirmation UI
+- Backend tests for auth and shop flow
 
 ## Project Structure
 
-```
+```text
 .
+├── .env.example
+├── requirements.txt
+├── README.md
 ├── backend/
-│   ├── venv/                      # Python Virtual Environment
-│   ├── main.py                    # Main FastAPI application
+│   ├── __init__.py
+│   ├── main.py
+│   ├── core/
+│   │   └── config.py
 │   ├── routes/
-│   │   └── auth.py                # Authentication routes (e.g., /token)
+│   │   ├── auth.py
+│   │   ├── data.py
+│   │   └── shop.py
 │   ├── controllers/
-│   │   └── auth_controller.py     # Authentication logic orchestration
-│   └── services/
-│       └── auth_service.py        # Core authentication business logic (dummy)
+│   │   └── auth_controller.py
+│   ├── services/
+│   │   └── auth_service.py
+│   └── tests/
+│       ├── conftest.py
+│       ├── test_auth_flow.py
+│       └── test_shop_flow.py
 └── frontend/
-    ├── index.html                 # Main login page HTML
-    ├── style.css                  # Styling for the login page
-    └── script.js                  # Frontend JavaScript for form submission and API calls
+    ├── package.json
+    ├── index.html
+    ├── legacy-static/
+    └── src/
 ```
 
-## How to Run the Prototype
+## How to Run
 
-Follow these steps to get the FinMark Login Prototype running on your local machine.
+Run the backend and frontend in two separate terminals.
 
 ### 1. Start the Backend
 
-1.  **Navigate to the backend directory:**
-    ```bash
-    cd "backend"
-    ```
-2.  **Activate the Python virtual environment:**
-    ```bash
-    .\venv\Scripts\activate
-    ```
-    *(If you haven't installed dependencies yet, run: `pip install fastapi uvicorn "python-multipart"`)*
-3.  **Run the FastAPI application:**
-    ```bash
-    uvicorn main:app --reload --host 0.0.0.0 --port 8000
-    ```
-    This will start the backend server, typically accessible at `http://localhost:8000`. You should see output indicating that Uvicorn is running.
+From the project root:
 
-### 2. Open the Frontend
+```bash
+python -m venv .venv
+```
 
-1.  **Navigate to the frontend directory:**
-    ```bash
-    cd "frontend"
-    ```
-2.  **Open `index.html` in your web browser.**
-    You can do this by simply double-clicking the `index.html` file in your file explorer, or by typing `start index.html` in the command line (on Windows).
-    The login page should open in your default browser, typically at a URL like `file:///frontend/index.html`.
+On Windows PowerShell:
 
-### 3. Test the Login
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
+```
 
-Use the following dummy credentials for testing:
+On macOS/Linux:
 
-*   **Email:** `user@example.com`
-*   **Password:** `password123`
+```bash
+source .venv/bin/activate
+```
 
-1.  Enter these credentials into the login form.
-2.  Click the "Login" button.
-3.  You should see a "Login successful! Token: fake-jwt-token" message below the form. If login fails (e.g., incorrect credentials), an error message will be displayed.
+Install backend dependencies:
 
-## Key Design Decisions
+```bash
+python -m pip install -r requirements.txt
+```
 
-*   **Clean Architecture:** Backend structured into routes, controllers, and services for clear separation of concerns, maintainability, and scalability.
-*   **Python FastAPI Backend:** Chosen for its high performance, ease of use, and alignment with the project's architectural discussions.
-*   **HTML/CSS/JS Frontend:** A simple, direct approach for the frontend to quickly demonstrate functionality without the overhead of a full frontend framework, while using essential web technologies.
-*   **CORS Enabled:** The FastAPI backend is configured to allow requests from the frontend running locally, preventing common cross-origin issues.
-*   **Dummy Authentication:** Credentials are hardcoded in the `auth_service.py` for demonstration purposes. In a real application, this would interact with a database and securely hash passwords.
-*   **Fake JWT Token:** A placeholder token is returned to simulate successful authentication and session management.
+Run FastAPI from the project root:
 
-## Next Steps
+```bash
+python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+```
 
-This prototype provides a foundational login module. Future enhancements would include:
+Backend URL:
 
-*   Database integration for user management.
-*   Proper JWT generation, validation, and session handling.
-*   User registration and password reset functionality.
-*   Integration with the broader FinMark dashboard and services.
-*   Robust error handling and input validation.
-*   Deployment to a containerized environment (e.g., Docker, Kubernetes).
+```text
+http://127.0.0.1:8000
+```
+
+API docs:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 2. Start the React Frontend
+
+Open another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open:
+
+```text
+http://127.0.0.1:5173
+```
+
+Demo login:
+
+```text
+Email: user@example.com
+Password: Password123!
+```
+
+## How to Test the Backend
+
+From the project root with the virtual environment activated:
+
+```bash
+pytest
+```
+
+## Notes for Production Improvement
+
+This is still a prototype. For a production-grade system, the next best upgrades are:
+
+1. Replace the in-memory user store with a real database.
+2. Store products and orders in database tables instead of static lists.
+3. Add order history per user.
+4. Add role-based access control for admin, seller, finance, and customer views.
+5. Store refresh tokens in the database so logout and token revocation are secure.
+6. Move token storage from `localStorage` to secure HttpOnly cookies.
+7. Add payment provider integration.
+8. Add Redis caching for product catalog and dashboard metrics.

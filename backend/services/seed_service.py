@@ -30,6 +30,8 @@ DEFAULT_ROLES = {
         "planning.manage",
     ],
     "Staff": ["orders.read", "orders.manage", "reports.read", "planning.read"],
+    "Viewer": ["orders.read", "reports.read", "planning.read"],
+    "Customer": [],
 }
 
 
@@ -60,19 +62,24 @@ def seed_database(db: Session) -> None:
         role.permissions = [permissions_by_code[code] for code in permission_codes]
         roles_by_name[role_name] = role
 
-    demo_email = "user@example.com"
-    demo_user = db.scalar(select(User).where(User.email == demo_email))
-    if demo_user is None:
-        demo_user = User(
-            username=demo_email,
-            email=demo_email,
-            hashed_password=hash_password("Password123!"),
-            is_verified=True,
-            is_active=True,
-            roles=[roles_by_name["Admin"]],
-        )
-        db.add(demo_user)
-    elif not demo_user.roles:
-        demo_user.roles = [roles_by_name["Admin"]]
+    seeded_users = [
+        ("user@example.com", "Password123!", "Admin"),
+        ("customer@example.com", "Customer123!", "Customer"),
+    ]
+
+    for email, password, role_name in seeded_users:
+        demo_user = db.scalar(select(User).where(User.email == email))
+        if demo_user is None:
+            demo_user = User(
+                username=email,
+                email=email,
+                hashed_password=hash_password(password),
+                is_verified=True,
+                is_active=True,
+                roles=[roles_by_name[role_name]],
+            )
+            db.add(demo_user)
+        elif not demo_user.roles:
+            demo_user.roles = [roles_by_name[role_name]]
 
     db.commit()

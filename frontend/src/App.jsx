@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { clearTokens, getAccessToken, getRefreshToken, login, verifySession } from './api/client.js';
-import CartDashboard from './pages/CartDashboard.jsx';
+import { AUTH_EXPIRED_EVENT, clearTokens, getAccessToken, getRefreshToken, getCurrentDatabaseUser, login, verifySession } from './api/client.js';
+import DashboardRouter from './pages/DashboardRouter.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
@@ -27,6 +27,17 @@ export default function App() {
     setSession((current) => (current.status === 'authenticated' ? current : { status: 'guest', user: null }));
   }, []);
 
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      clearTokens();
+      setSession({ status: 'guest', user: null });
+    };
+
+    window.addEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, handleAuthExpired);
+  }, []);
+
   useEffect(() => {
     const handleNavigation = () => setAuthRoute(getAuthRoute());
     window.addEventListener('popstate', handleNavigation);
@@ -46,8 +57,9 @@ export default function App() {
       }
 
       try {
-        const data = await verifySession();
-        setSession({ status: 'authenticated', user: data.authenticated_user });
+        await verifySession();
+        const user = await getCurrentDatabaseUser();
+        setSession({ status: 'authenticated', user });
       } catch {
         clearTokens();
         setSession({ status: 'guest', user: null });
@@ -59,8 +71,9 @@ export default function App() {
 
   const handleLogin = async (credentials) => {
     const tokenData = await login(credentials);
-    const verified = await verifySession();
-    setSession({ status: 'authenticated', user: verified.authenticated_user });
+    await verifySession();
+    const user = await getCurrentDatabaseUser();
+    setSession({ status: 'authenticated', user });
     return tokenData;
   };
 
@@ -89,7 +102,7 @@ export default function App() {
   }
 
   return isLoggedIn ? (
-    <CartDashboard user={session.user} onLogout={handleLogout} />
+    <DashboardRouter user={session.user} onLogout={handleLogout} />
   ) : (
     <LoginPage onLogin={handleLogin} />
   );

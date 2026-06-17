@@ -3,6 +3,7 @@ import { checkoutCart, getProducts } from '../api/client.js';
 import CartPanel from '../components/CartPanel.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import StatCard from '../components/StatCard.jsx';
+import { getDisplayName, getRoleNames, normalizeUser } from '../utils/access.js';
 
 const currency = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -10,20 +11,29 @@ const currency = new Intl.NumberFormat('en-PH', {
   maximumFractionDigits: 0,
 });
 
-const navSections = [
-  { icon: '⌂', label: 'Dashboard', active: false },
-  { icon: '▣', label: 'Inventory', active: false },
-  { icon: '◫', label: 'Orders', active: false },
-  { icon: '⇄', label: 'Shipments', active: false },
-  { icon: '🛒', label: 'Storefront', active: true },
-  { icon: '◴', label: 'Reports', active: false },
-  { icon: '⚙', label: 'System', active: false },
-  { icon: '?', label: 'Support', active: false },
+const baseNavSections = [
+  { icon: '⌂', label: 'Dashboard', target: 'dashboard' },
+  { icon: '▣', label: 'Inventory', target: 'inventory' },
+  { icon: '◫', label: 'Orders', target: 'orders' },
+  { icon: '⇄', label: 'Shipments', target: 'shipments' },
+  { icon: '🛒', label: 'Storefront', target: 'storefront', active: true },
+  { icon: '◴', label: 'Reports', target: 'reports' },
+  { icon: '?', label: 'Support', target: 'support' },
 ];
 
 const categoryShortcuts = ['All', 'Finance Tools', 'Marketing', 'Operations', 'Analytics', 'E-Commerce', 'Support'];
 
-export default function CartDashboard({ user, onLogout }) {
+export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, canOpenAdmin = false }) {
+  const user = useMemo(() => normalizeUser(rawUser), [rawUser]);
+  const displayName = getDisplayName(user);
+  const roleNames = getRoleNames(user);
+  const roleLabel = roleNames.length ? roleNames.map((role) => role.charAt(0).toUpperCase() + role.slice(1)).join(', ') : 'Product user';
+  const navSections = useMemo(() => (
+    canOpenAdmin
+      ? [...baseNavSections, { icon: '🛡️', label: 'Admin CRUD', target: 'admin-crud', admin: true }]
+      : baseNavSections
+  ), [canOpenAdmin]);
+
   const [products, setProducts] = useState([]);
   const [cart, setCart] = useState({});
   const [query, setQuery] = useState('');
@@ -138,14 +148,14 @@ export default function CartDashboard({ user, onLogout }) {
 
   const activities = useMemo(() => {
     const latestCart = cartItems.slice(0, 4).map((item) => ({
-      actor: user,
+      actor: displayName,
       action: `added ${item.quantity} ×`,
       target: item.name,
       time: 'Now',
     }));
 
     const orderActivity = order
-      ? [{ actor: user, action: 'completed order', target: order.order_id, time: 'Now' }]
+      ? [{ actor: displayName, action: 'completed order', target: order.order_id, time: 'Now' }]
       : [];
 
     return [
@@ -155,7 +165,7 @@ export default function CartDashboard({ user, onLogout }) {
       { actor: 'FastAPI', action: 'served', target: 'protected products API', time: '11:40 AM' },
       { actor: 'React', action: 'synced', target: 'cart state in real time', time: '11:35 AM' },
     ].slice(0, 7);
-  }, [cartItems, lowStockProducts.length, order, user]);
+  }, [cartItems, displayName, lowStockProducts.length, order]);
 
   return (
     <main className="dashboard-shell">
@@ -165,21 +175,29 @@ export default function CartDashboard({ user, onLogout }) {
             <div className="brand-symbol">⌁</div>
             <div>
               <strong>Ware Sync</strong>
-              <span>FinMark Commerce</span>
+              <span>Product Dashboard</span>
             </div>
           </div>
 
-          <button className="primary-btn add-item-btn" type="button">
-            <span>+</span> Add New Item <b>⌄</b>
+          <button className="primary-btn add-item-btn" type="button" onClick={() => document.getElementById('storefront')?.scrollIntoView({ behavior: 'smooth' })}>
+            <span>🛒</span> Browse Products <b>⌄</b>
           </button>
 
           <nav className="side-nav" aria-label="Dashboard sections">
             {navSections.map((item) => (
-              <a key={item.label} className={item.active ? 'active' : ''} href={`#${item.label.toLowerCase()}`}>
-                <span>{item.icon}</span>
-                {item.label}
-                {['Inventory', 'Orders', 'Storefront'].includes(item.label) && <small>⌄</small>}
-              </a>
+              item.admin ? (
+                <button key={item.label} className="side-nav-button" type="button" onClick={onOpenAdmin}>
+                  <span>{item.icon}</span>
+                  {item.label}
+                  <small>→</small>
+                </button>
+              ) : (
+                <a key={item.label} className={item.active ? 'active' : ''} href={`#${item.target}`}>
+                  <span>{item.icon}</span>
+                  {item.label}
+                  {['Inventory', 'Orders', 'Storefront'].includes(item.label) && <small>⌄</small>}
+                </a>
+              )
             ))}
           </nav>
         </div>
@@ -200,11 +218,13 @@ export default function CartDashboard({ user, onLogout }) {
           </label>
 
           <div className="top-actions">
+            {canOpenAdmin && <button className="light-btn small" type="button" onClick={onOpenAdmin}>Admin CRUD</button>}
             <button className="icon-btn" type="button" aria-label="Notifications">🔔</button>
             <span className="low-stock-pill">{lowStockProducts.length} Low stock</span>
             <div className="profile-chip">
-              <div className="profile-avatar">{user?.[0]?.toUpperCase() || 'U'}</div>
-              <span>{user}</span>
+              <div className="profile-avatar">{displayName?.[0]?.toUpperCase() || 'U'}</div>
+              <span>{displayName}</span>
+              <small>{roleLabel}</small>
             </div>
           </div>
         </header>
@@ -213,10 +233,10 @@ export default function CartDashboard({ user, onLogout }) {
           <section className="primary-column">
             <div className="page-title-row">
               <div>
-                <h1>Commerce Overview</h1>
-                <p>Monitor add-to-cart activity, stock status, checkout totals, and product movement in real time.</p>
+                <h1>Product Dashboard</h1>
+                <p>Available for Admin, Staff, Viewer, and User roles. Browse products, monitor stock, and create persisted orders.</p>
               </div>
-              <button className="primary-btn add-sale-btn" type="button">+ Add New Sale</button>
+              <button className="primary-btn add-sale-btn" type="button" onClick={() => document.getElementById('storefront')?.scrollIntoView({ behavior: 'smooth' })}>+ New Product Order</button>
             </div>
 
             <section className="stats-grid" id="analytics">

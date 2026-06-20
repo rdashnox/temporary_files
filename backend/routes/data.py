@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/protected")
-async def read_protected_data(current_user: dict = Depends(get_current_user)):
+def read_protected_data(current_user: dict = Depends(get_current_user)):
     """Retrieve protected data, requiring a valid signed JWT access token."""
     return {
         "message": "This is protected data!",
@@ -17,7 +17,7 @@ async def read_protected_data(current_user: dict = Depends(get_current_user)):
 
 
 @router.get("/business-modules")
-async def read_business_modules(current_user: dict = Depends(get_current_user)):
+def read_business_modules(current_user: dict = Depends(get_current_user)):
     """
     Return protected prototype data for the executive business dashboard.
 

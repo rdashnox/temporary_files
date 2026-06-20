@@ -116,3 +116,28 @@ backend/
 ├── scripts/                    SQL setup and seed scripts
 └── tests/                      Backend tests
 ```
+
+## Enterprise Scale Notes
+
+The backend now includes production-oriented settings for high concurrency:
+
+```env
+AUTO_CREATE_DB=false
+SEED_DEMO_DATA=false
+DB_POOL_SIZE=20
+DB_MAX_OVERFLOW=40
+DB_POOL_TIMEOUT=30
+DB_POOL_RECYCLE=1800
+THREADPOOL_TOKENS=100
+PRODUCT_CACHE_MAX_AGE_SECONDS=60
+```
+
+New endpoints:
+
+```text
+GET /api/v1/health        Liveness check
+GET /api/v1/ready         Database readiness check
+GET /api/v1/scale/profile Non-sensitive scaling profile
+```
+
+For 1,000 active users, use MySQL/PostgreSQL, multiple API workers, and the included Locust load test. Do not use SQLite or `uvicorn --reload` for production traffic.

@@ -55,11 +55,8 @@ export default function ProductCard({ product, quantityInCart, onAdd, compact = 
 
         <div className="product-actions">
           <button className="text-btn" type="button">View Details</button>
-          <button className="light-btn" type="button" disabled={isMaxed} onClick={onAdd}>
-            {isMaxed ? 'Max' : 'Add'}
-          </button>
           <button className="primary-btn small" type="button" disabled={isMaxed} onClick={onAdd}>
-            {quantityInCart ? `+${quantityInCart}` : 'Add Cart'}
+            {isMaxed ? 'Max' : quantityInCart ? `+${quantityInCart}` : 'Add Cart'}
           </button>
         </div>
       </div>

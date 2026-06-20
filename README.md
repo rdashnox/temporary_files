@@ -25,6 +25,38 @@ Use these accounts after running the SQL setup and seed scripts.
 
 > `user@example.com / Password123!` is also seeded automatically by the Python development seeder. For the complete role demo, run the SQL seed scripts below.
 
+
+## Microservice 3-Node Deployment
+
+This version also includes a local/cloud-ready microservice deployment for the four core capabilities requested:
+
+| Service | FastAPI entrypoint | Replicas/nodes | Gateway route |
+|---|---|---:|---|
+| Auth/Login | `backend.microservices.auth_main:app` | 3 | `/api/v1/auth`, `/api/v1/data`, `/api/v1/database` |
+| Order | `backend.microservices.order_main:app` | 3 | `/api/v1/orders`, `/api/v1/shop` |
+| Inventory | `backend.microservices.inventory_main:app` | 3 | `/api/v1/inventory` |
+| Notification | `backend.microservices.notification_main:app` | 3 | `/api/v1/notifications` |
+
+Run it locally with Docker:
+
+```powershell
+.\start-microservices.ps1
+```
+
+Or manually:
+
+```powershell
+docker compose -f docker-compose.microservices.yml up --build -d
+```
+
+The Nginx API Gateway runs on:
+
+```text
+http://127.0.0.1:8000
+```
+
+If one node of a service fails, Nginx passively fails over to the remaining two nodes. See `MICROSERVICE_3_NODE_DEPLOYMENT.md` for the architecture, failover test, and Kubernetes notes.
+
 ## What the Project Has
 
 - FastAPI backend with modular routes, services, schemas, dependencies, and database models.
@@ -429,3 +461,8 @@ GET  /api/v1/database/audit-logs
 - Keep `.env` private. Do not commit real passwords or production secrets.
 - For local demo, use the seeded accounts listed above.
 - For production, replace the `SECRET_KEY`, database credentials, and demo passwords.
+
+
+## Latest startup fix
+
+If you see `Unknown column 'orders.idempotency_key' in 'field list'`, use this updated version. The backend now auto-upgrades the local MySQL schema when `AUTO_CREATE_DB=true`. See `MYSQL_IDEMPOTENCY_SCHEMA_FIX.md` for details and manual SQL fallback.

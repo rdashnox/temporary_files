@@ -64,6 +64,20 @@ class Settings:
     db_password: str
     database_echo: bool
     seed_demo_data: bool
+    auto_create_db: bool
+    db_pool_size: int
+    db_max_overflow: int
+    db_pool_timeout: int
+    db_pool_recycle: int
+    db_connect_timeout: int
+    app_environment: str
+    allowed_hosts: List[str]
+    gzip_minimum_size: int
+    threadpool_tokens: int
+    product_cache_max_age_seconds: int
+    deployment_mode: str
+    service_replicas: int
+    service_instance_name: str
 
     @property
     def resolved_database_url(self) -> str:
@@ -110,6 +124,20 @@ def get_settings() -> Settings:
         db_password=os.getenv("DB_PASSWORD", ""),
         database_echo=_get_bool_env("DATABASE_ECHO", False),
         seed_demo_data=_get_bool_env("SEED_DEMO_DATA", True),
+        auto_create_db=_get_bool_env("AUTO_CREATE_DB", True),
+        db_pool_size=_get_int_env("DB_POOL_SIZE", 20),
+        db_max_overflow=_get_int_env("DB_MAX_OVERFLOW", 40),
+        db_pool_timeout=_get_int_env("DB_POOL_TIMEOUT", 30),
+        db_pool_recycle=_get_int_env("DB_POOL_RECYCLE", 1800),
+        db_connect_timeout=_get_int_env("DB_CONNECT_TIMEOUT", 10),
+        app_environment=os.getenv("APP_ENV", "development"),
+        allowed_hosts=_get_list_env("ALLOWED_HOSTS", "*"),
+        gzip_minimum_size=_get_int_env("GZIP_MINIMUM_SIZE", 1000),
+        threadpool_tokens=_get_int_env("THREADPOOL_TOKENS", 100),
+        product_cache_max_age_seconds=_get_int_env("PRODUCT_CACHE_MAX_AGE_SECONDS", 60),
+        deployment_mode=os.getenv("DEPLOYMENT_MODE", "single-app"),
+        service_replicas=_get_int_env("SERVICE_REPLICAS", 3),
+        service_instance_name=os.getenv("SERVICE_INSTANCE_NAME", ""),
     )
 
 

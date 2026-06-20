@@ -56,3 +56,5 @@ LEFT JOIN permissions p ON p.id = rp.permission_id
 WHERE r.name IN ('Admin', 'Auditor')
 GROUP BY r.id, r.name
 ORDER BY r.name;
+
+select * from users;

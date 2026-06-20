@@ -1,0 +1,388 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: finmark
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: finmark-secrets
+  namespace: finmark
+type: Opaque
+stringData:
+  SECRET_KEY: replace-with-a-real-64-character-secret
+  DATABASE_URL: mysql+pymysql://finmark_app:finmark_password_change_me@mysql.finmark.svc.cluster.local:3306/finmark_db
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finmark-backend-config
+  namespace: finmark
+data:
+  APP_ENV: production
+  DEPLOYMENT_MODE: microservices-3-node
+  SERVICE_REPLICAS: "3"
+  FRONTEND_ORIGINS: https://your-domain.com,http://localhost:5173,http://127.0.0.1:5173
+  FRONTEND_BASE_URL: https://your-domain.com
+  ALLOWED_HOSTS: "*"
+  AUTO_CREATE_DB: "false"
+  SEED_DEMO_DATA: "false"
+  DB_POOL_SIZE: "8"
+  DB_MAX_OVERFLOW: "12"
+  DB_POOL_TIMEOUT: "30"
+  DB_POOL_RECYCLE: "1800"
+  DB_CONNECT_TIMEOUT: "10"
+  THREADPOOL_TOKENS: "80"
+  PRODUCT_CACHE_MAX_AGE_SECONDS: "60"
+  WEB_CONCURRENCY: "2"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: finmark-gateway-nginx
+  namespace: finmark
+data:
+  nginx.conf: |
+    worker_processes auto;
+
+    events { worker_connections 8192; }
+
+    http {
+      upstream auth_service_pool { least_conn; server auth-service:8000; keepalive 64; }
+      upstream order_service_pool { least_conn; server order-service:8000; keepalive 64; }
+      upstream inventory_service_pool { least_conn; server inventory-service:8000; keepalive 64; }
+      upstream notification_service_pool { least_conn; server notification-service:8000; keepalive 64; }
+
+      server {
+        listen 80;
+        server_name _;
+
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_next_upstream error timeout http_502 http_503 http_504;
+        proxy_next_upstream_tries 3;
+
+        location = /api/v1/health {
+          default_type application/json;
+          return 200 '{"status":"ok","service":"api-gateway","message":"Kubernetes gateway is running"}';
+        }
+        location /api/v1/auth/ { proxy_pass http://auth_service_pool; }
+        location /api/v1/data/ { proxy_pass http://auth_service_pool; }
+        location /api/v1/database/ { proxy_pass http://auth_service_pool; }
+        location /api/v1/inventory/ { proxy_pass http://inventory_service_pool; }
+        location /api/v1/orders/ { proxy_pass http://order_service_pool; }
+        location /api/v1/shop/ { proxy_pass http://order_service_pool; }
+        location /api/v1/notifications { proxy_pass http://notification_service_pool; }
+      }
+    }
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-init
+  namespace: finmark
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: db-init
+          image: your-registry/finmark-platform-microservice:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "backend.scripts.init_service_database"]
+          envFrom:
+            - configMapRef:
+                name: finmark-backend-config
+            - secretRef:
+                name: finmark-secrets
+          env:
+            - name: AUTO_CREATE_DB
+              value: "true"
+            - name: SEED_DEMO_DATA
+              value: "true"
+            - name: SERVICE_INSTANCE_NAME
+              value: db-init
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: finmark
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: your-registry/finmark-platform-microservice:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: finmark-backend-config
+            - secretRef:
+                name: finmark-secrets
+          env:
+            - name: SERVICE_MODULE
+              value: backend.microservices.auth_main:app
+            - name: SERVICE_INSTANCE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: finmark
+spec:
+  selector:
+    app: auth-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: finmark
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: order-service
+  template:
+    metadata:
+      labels:
+        app: order-service
+    spec:
+      containers:
+        - name: order-service
+          image: your-registry/finmark-platform-microservice:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: finmark-backend-config
+            - secretRef:
+                name: finmark-secrets
+          env:
+            - name: SERVICE_MODULE
+              value: backend.microservices.order_main:app
+            - name: SERVICE_INSTANCE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: order-service
+  namespace: finmark
+spec:
+  selector:
+    app: order-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: finmark
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: inventory-service
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      containers:
+        - name: inventory-service
+          image: your-registry/finmark-platform-microservice:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: finmark-backend-config
+            - secretRef:
+                name: finmark-secrets
+          env:
+            - name: SERVICE_MODULE
+              value: backend.microservices.inventory_main:app
+            - name: SERVICE_INSTANCE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: finmark
+spec:
+  selector:
+    app: inventory-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: finmark
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: your-registry/finmark-platform-microservice:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: finmark-backend-config
+            - secretRef:
+                name: finmark-secrets
+          env:
+            - name: SERVICE_MODULE
+              value: backend.microservices.notification_main:app
+            - name: SERVICE_INSTANCE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: finmark
+spec:
+  selector:
+    app: notification-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: finmark
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27-alpine
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: gateway-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+      volumes:
+        - name: gateway-config
+          configMap:
+            name: finmark-gateway-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: finmark
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

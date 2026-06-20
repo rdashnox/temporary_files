@@ -11,6 +11,8 @@ DEFAULT_PERMISSIONS = [
     ("roles.manage", "Manage Roles", "access", "Manage roles and permissions."),
     ("orders.read", "View Orders", "orders", "View order lists and order details."),
     ("orders.manage", "Manage Orders", "orders", "Create and update orders."),
+    ("inventory.read", "View Inventory", "inventory", "View product catalog and stock summaries."),
+    ("notifications.read", "View Notifications", "notifications", "View in-app order and stock notifications."),
     ("reports.read", "View Reports", "reports", "View generated reports."),
     ("reports.manage", "Manage Reports", "reports", "Create and update report jobs."),
     ("planning.read", "View Planning Requests", "planning", "View planning requests."),
@@ -24,14 +26,16 @@ DEFAULT_ROLES = {
     "Manager": [
         "orders.read",
         "orders.manage",
+        "inventory.read",
+        "notifications.read",
         "reports.read",
         "reports.manage",
         "planning.read",
         "planning.manage",
     ],
-    "Staff": ["orders.read", "orders.manage", "reports.read", "planning.read"],
-    "Viewer": ["orders.read", "reports.read", "planning.read"],
-    "Customer": [],
+    "Staff": ["orders.read", "orders.manage", "inventory.read", "notifications.read", "reports.read", "planning.read"],
+    "Viewer": ["orders.read", "inventory.read", "notifications.read", "reports.read", "planning.read"],
+    "Customer": ["inventory.read", "notifications.read"],
 }
 
 

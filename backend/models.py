@@ -138,6 +138,7 @@ class User(Base):
     planning_requests: Mapped[list["PlanningRequest"]] = relationship(
         back_populates="requested_by", lazy="selectin"
     )
+    notifications: Mapped[list["Notification"]] = relationship(back_populates="user", lazy="selectin")
 
     __table_args__ = (
         Index("ix_users_email_verified", "email", "is_verified"),
@@ -150,6 +151,7 @@ class Order(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     order_number: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    idempotency_key: Mapped[str] = mapped_column(String(120), unique=True, nullable=True, index=True)
     customer_name: Mapped[str] = mapped_column(String(120), nullable=False)
     delivery_address: Mapped[str] = mapped_column(String(255), nullable=False)
     payment_method: Mapped[str] = mapped_column(String(60), nullable=False, default="Cash on Delivery")
@@ -169,6 +171,11 @@ class Order(Base):
     user: Mapped[User] = relationship(back_populates="orders", lazy="selectin")
     items: Mapped[list["OrderItem"]] = relationship(
         back_populates="order", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    __table_args__ = (
+        Index("ix_orders_status_created_at", "status", "created_at"),
+        Index("ix_orders_user_created_at", "user_id", "created_at"),
     )
 
 
@@ -230,6 +237,27 @@ class PlanningRequest(Base):
     )
 
     requested_by: Mapped[User] = relationship(back_populates="planning_requests", lazy="selectin")
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    title: Mapped[str] = mapped_column(String(160), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    channel: Mapped[str] = mapped_column(String(40), default="in_app", nullable=False, index=True)
+    entity_type: Mapped[str] = mapped_column(String(80), nullable=True, index=True)
+    entity_id: Mapped[str] = mapped_column(String(80), nullable=True, index=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+    user: Mapped[User] = relationship(back_populates="notifications", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_notifications_user_read", "user_id", "is_read"),
+        Index("ix_notifications_user_created_at", "user_id", "created_at"),
+    )
 
 
 class AuditLog(Base):

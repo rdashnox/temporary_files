@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.post("/token")
-async def login_for_access_token(
+def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
@@ -38,7 +38,7 @@ async def login_for_access_token(
 
 
 @router.post("/refresh")
-async def refresh_access_token(
+def refresh_access_token(
     refresh_request: RefreshTokenRequest,
     db: Session = Depends(get_db),
 ):
@@ -54,7 +54,7 @@ async def refresh_access_token(
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_user_route(user_create: UserCreate, db: Session = Depends(get_db)):
+def register_user_route(user_create: UserCreate, db: Session = Depends(get_db)):
     """Register a new user and create an email verification token."""
     try:
         user = auth_controller.register_new_user(
@@ -82,7 +82,7 @@ async def register_user_route(user_create: UserCreate, db: Session = Depends(get
 
 
 @router.get("/verify-email")
-async def verify_email(token: str, db: Session = Depends(get_db)):
+def verify_email(token: str, db: Session = Depends(get_db)):
     """Verify a user's email address from a verification token."""
     try:
         user = auth_controller.verify_user_email(db, token)
@@ -99,7 +99,7 @@ async def verify_email(token: str, db: Session = Depends(get_db)):
 
 
 @router.post("/resend-verification")
-async def resend_verification(request: EmailRequest, db: Session = Depends(get_db)):
+def resend_verification(request: EmailRequest, db: Session = Depends(get_db)):
     """Create a new verification token for an unverified account."""
     try:
         result = auth_controller.resend_user_verification(db, request.username)
@@ -119,7 +119,7 @@ async def resend_verification(request: EmailRequest, db: Session = Depends(get_d
 
 
 @router.post("/forgot-password")
-async def forgot_password(request: EmailRequest, db: Session = Depends(get_db)):
+def forgot_password(request: EmailRequest, db: Session = Depends(get_db)):
     """Request a password reset link/token."""
     result = auth_controller.request_password_reset(db, request.username)
 
@@ -136,7 +136,7 @@ async def forgot_password(request: EmailRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/reset-password")
-async def reset_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
+def reset_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
     """Reset a user's password using a valid reset token."""
     try:
         user = auth_controller.reset_password(

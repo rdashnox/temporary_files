@@ -1,0 +1,14 @@
+﻿name,port,pid,app
+auth-service-1,8101,41628,backend.microservices.auth_main:app
+auth-service-2,8102,38568,backend.microservices.auth_main:app
+auth-service-3,8103,15472,backend.microservices.auth_main:app
+order-service-1,8201,4724,backend.microservices.order_main:app
+order-service-2,8202,26444,backend.microservices.order_main:app
+order-service-3,8203,1584,backend.microservices.order_main:app
+inventory-service-1,8301,41156,backend.microservices.inventory_main:app
+inventory-service-2,8302,16584,backend.microservices.inventory_main:app
+inventory-service-3,8303,5512,backend.microservices.inventory_main:app
+notification-service-1,8401,11104,backend.microservices.notification_main:app
+notification-service-2,8402,19324,backend.microservices.notification_main:app
+notification-service-3,8403,38376,backend.microservices.notification_main:app
+local-api-gateway-1,8000,15928,backend.local_gateway:app

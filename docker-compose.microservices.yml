@@ -1,0 +1,181 @@
+x-backend-env: &backend-env
+  APP_ENV: production
+  DEPLOYMENT_MODE: microservices-3-node
+  SERVICE_REPLICAS: 3
+  SECRET_KEY: replace-with-a-real-64-character-secret
+  FRONTEND_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080
+  FRONTEND_BASE_URL: http://localhost:5173
+  ALLOWED_HOSTS: '*'
+  DATABASE_URL: mysql+pymysql://finmark_app:finmark_password_change_me@mysql:3306/finmark_db
+  AUTO_CREATE_DB: 'false'
+  SEED_DEMO_DATA: 'false'
+  DB_POOL_SIZE: 8
+  DB_MAX_OVERFLOW: 12
+  DB_POOL_TIMEOUT: 30
+  DB_POOL_RECYCLE: 1800
+  DB_CONNECT_TIMEOUT: 10
+  THREADPOOL_TOKENS: 80
+  PRODUCT_CACHE_MAX_AGE_SECONDS: 60
+  WEB_CONCURRENCY: 2
+
+x-microservice-common: &microservice-common
+  build:
+    context: .
+    dockerfile: deployment/Dockerfile.microservice
+  image: finmark-platform-microservice:local
+  depends_on:
+    db-init:
+      condition: service_completed_successfully
+  expose:
+    - '8000'
+  restart: unless-stopped
+
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: finmark_db
+      MYSQL_USER: finmark_app
+      MYSQL_PASSWORD: finmark_password_change_me
+      MYSQL_ROOT_PASSWORD: root_password_change_me
+    command:
+      - --max_connections=700
+      - --innodb_buffer_pool_size=768M
+      - --innodb_flush_log_at_trx_commit=2
+      - --skip-name-resolve
+    volumes:
+      - finmark_microservice_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-proot_password_change_me']
+      interval: 10s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  db-init:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.microservice
+    image: finmark-platform-microservice:local
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      <<: *backend-env
+      AUTO_CREATE_DB: 'true'
+      SEED_DEMO_DATA: 'true'
+      SERVICE_INSTANCE_NAME: db-init
+    command: ['python', '-m', 'backend.scripts.init_service_database']
+    restart: 'no'
+
+  auth-service-1:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.auth_main:app
+      SERVICE_INSTANCE_NAME: auth-service-1
+  auth-service-2:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.auth_main:app
+      SERVICE_INSTANCE_NAME: auth-service-2
+  auth-service-3:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.auth_main:app
+      SERVICE_INSTANCE_NAME: auth-service-3
+
+  order-service-1:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.order_main:app
+      SERVICE_INSTANCE_NAME: order-service-1
+  order-service-2:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.order_main:app
+      SERVICE_INSTANCE_NAME: order-service-2
+  order-service-3:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.order_main:app
+      SERVICE_INSTANCE_NAME: order-service-3
+
+  inventory-service-1:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.inventory_main:app
+      SERVICE_INSTANCE_NAME: inventory-service-1
+  inventory-service-2:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.inventory_main:app
+      SERVICE_INSTANCE_NAME: inventory-service-2
+  inventory-service-3:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.inventory_main:app
+      SERVICE_INSTANCE_NAME: inventory-service-3
+
+  notification-service-1:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.notification_main:app
+      SERVICE_INSTANCE_NAME: notification-service-1
+  notification-service-2:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.notification_main:app
+      SERVICE_INSTANCE_NAME: notification-service-2
+  notification-service-3:
+    <<: *microservice-common
+    environment:
+      <<: *backend-env
+      SERVICE_MODULE: backend.microservices.notification_main:app
+      SERVICE_INSTANCE_NAME: notification-service-3
+
+  microservice-gateway:
+    image: nginx:1.27-alpine
+    depends_on:
+      auth-service-1:
+        condition: service_healthy
+      auth-service-2:
+        condition: service_healthy
+      auth-service-3:
+        condition: service_healthy
+      order-service-1:
+        condition: service_healthy
+      order-service-2:
+        condition: service_healthy
+      order-service-3:
+        condition: service_healthy
+      inventory-service-1:
+        condition: service_healthy
+      inventory-service-2:
+        condition: service_healthy
+      inventory-service-3:
+        condition: service_healthy
+      notification-service-1:
+        condition: service_healthy
+      notification-service-2:
+        condition: service_healthy
+      notification-service-3:
+        condition: service_healthy
+    ports:
+      - '8000:80'
+    volumes:
+      - ./deployment/nginx.microservices.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
+
+volumes:
+  finmark_microservice_mysql_data:

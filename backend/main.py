@@ -1,54 +1,43 @@
-from contextlib import asynccontextmanager
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-
+from .app_factory import create_service_app
 from .core.config import settings
-from .database import init_db, session_scope
-from .routes import auth, data, database_entities, shop
-from .services.seed_service import seed_database
+from .routes import auth, data, database_entities, inventory, notifications, orders, shop
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    init_db()
-    if settings.seed_demo_data:
-        with session_scope() as db:
-            seed_database(db)
-    yield
-
-
-app = FastAPI(lifespan=lifespan)
-
-# Configure CORS (Cross-Origin Resource Sharing)
-# This allows the frontend application (e.g., running on localhost:8080)
-# to make requests to this backend API.
-origins = settings.frontend_origins
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app = create_service_app(
+    service_name="Platform",
+    service_slug="platform-monolith",
+    router_specs=(
+        (auth.router, "/api/v1/auth", ("auth",)),
+        (data.router, "/api/v1/data", ("data",)),
+        (inventory.router, "/api/v1/inventory", ("inventory-service",)),
+        (orders.router, "/api/v1/orders", ("order-service",)),
+        (notifications.router, "/api/v1/notifications", ("notification-service",)),
+        (shop.router, "/api/v1/shop", ("shop-legacy",)),
+        (database_entities.router, "/api/v1/database", ("database",)),
+    ),
 )
 
-# Include API routers
-# Routes for authentication (login, registration)
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-# Routes for protected data
-app.include_router(data.router, prefix="/api/v1/data", tags=["data"])
-# Routes for product catalog, cart preview, and checkout
-app.include_router(shop.router, prefix="/api/v1/shop", tags=["shop"])
-# Database-backed roles, permissions, orders, reports, planning requests, and audit logs
-app.include_router(database_entities.router, prefix="/api/v1/database", tags=["database"])
 
-
-@app.get("/api/v1/health")
-async def health_check():
-    return {"status": "ok", "message": "FastAPI backend is running"}
-
-
-@app.get("/")
-async def read_root():
-    return {"message": "Welcome to FinMark Backend API", "health": "/api/v1/health"}
+@app.get("/api/v1/scale/profile")
+def scale_profile():
+    """Expose non-sensitive scalability configuration for deployment checks."""
+    return {
+        "target_active_users": 1000,
+        "deployment_mode": settings.deployment_mode,
+        "service_replicas": settings.service_replicas,
+        "microservice_topology": {
+            "auth-service": settings.service_replicas,
+            "order-service": settings.service_replicas,
+            "inventory-service": settings.service_replicas,
+            "notification-service": settings.service_replicas,
+        },
+        "recommended_production_workers": "2 to 4 per service replica, then verify with load test",
+        "database_pool_size_per_worker": settings.db_pool_size,
+        "database_max_overflow_per_worker": settings.db_max_overflow,
+        "threadpool_tokens_per_worker": settings.threadpool_tokens,
+        "product_cache_max_age_seconds": settings.product_cache_max_age_seconds,
+        "notes": [
+            "Use the included microservice Docker Compose file for local 3-node service testing.",
+            "Use the included Kubernetes manifests for cloud deployments with 3 replicas per service.",
+            "Run loadtests/locustfile.py against the Nginx/API gateway before real user traffic.",
+        ],
+    }

@@ -27,6 +27,9 @@ class CheckoutRequest(BaseModel):
     delivery_address: str = Field(..., min_length=5, max_length=180)
     payment_method: str = Field(default="Cash on Delivery", max_length=40)
     coupon_code: Optional[str] = Field(default=None, max_length=20)
+    # Optional retry-safety key. The frontend also sends this as an
+    # Idempotency-Key header so checkout retries do not create duplicate orders.
+    idempotency_key: Optional[str] = Field(default=None, max_length=120)
 
 
 class CheckoutItem(BaseModel):

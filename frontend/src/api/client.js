@@ -1,4 +1,6 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS || 15000);
+const PRODUCT_CACHE_TTL_MS = Number(import.meta.env.VITE_PRODUCT_CACHE_TTL_MS || 60000);
 
 const TOKEN_KEYS = {
   access: 'access_token',
@@ -58,10 +60,23 @@ let refreshPromise = null;
 let authExpiredAlreadyNotified = false;
 
 const safeFetch = async (url, options = {}) => {
+  const controller = options.signal ? null : new AbortController();
+  const timeoutId = controller
+    ? window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    : null;
+
   try {
-    return await fetch(url, options);
-  } catch {
+    return await fetch(url, {
+      ...options,
+      signal: options.signal || controller?.signal,
+    });
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      throw new BackendOfflineError(`Backend API request timed out after ${REQUEST_TIMEOUT_MS}ms.`);
+    }
     throw makeBackendOfflineError();
+  } finally {
+    if (timeoutId) window.clearTimeout(timeoutId);
   }
 };
 
@@ -225,16 +240,51 @@ export const authFetch = async (path, options = {}, retried = false) => {
   return response;
 };
 
-export const getProducts = async () => {
-  const response = await authFetch('/shop/products');
-  return parseResponse(response);
+const productCache = {
+  timestamp: 0,
+  data: null,
+  promise: null,
+};
+
+const createClientRequestId = (prefix = 'req') => {
+  const randomPart = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `${prefix}-${randomPart}`;
+};
+
+export const getProducts = async ({ forceRefresh = false } = {}) => {
+  const now = Date.now();
+  if (!forceRefresh && productCache.data && now - productCache.timestamp < PRODUCT_CACHE_TTL_MS) {
+    return productCache.data;
+  }
+
+  if (!forceRefresh && productCache.promise) return productCache.promise;
+
+  productCache.promise = (async () => {
+    const response = await authFetch('/inventory/products');
+    const data = await parseResponse(response);
+    productCache.data = data;
+    productCache.timestamp = Date.now();
+    return data;
+  })().finally(() => {
+    productCache.promise = null;
+  });
+
+  return productCache.promise;
 };
 
 export const checkoutCart = async (payload) => {
-  const response = await authFetch('/shop/checkout', {
+  const idempotencyKey = payload.idempotency_key || createClientRequestId('checkout');
+  const response = await authFetch('/orders/checkout', {
     method: 'POST',
-    body: JSON.stringify(payload),
+    headers: { 'Idempotency-Key': idempotencyKey },
+    body: JSON.stringify({ ...payload, idempotency_key: idempotencyKey }),
   });
+  return parseResponse(response);
+};
+
+export const getNotifications = async (params = {}) => {
+  const query = toQueryString(params);
+  const response = await authFetch(`/notifications${query}`);
   return parseResponse(response);
 };
 

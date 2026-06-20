@@ -17,6 +17,8 @@ fallback for development and demonstration.
 from __future__ import annotations
 
 import asyncio
+import json
+import os
 from itertools import count
 from time import perf_counter
 from typing import Iterable
@@ -29,7 +31,7 @@ from fastapi.responses import JSONResponse, Response
 
 from .core.config import settings
 
-SERVICE_POOLS: dict[str, list[str]] = {
+DEFAULT_SERVICE_POOLS: dict[str, list[str]] = {
     "auth-service": [
         "http://127.0.0.1:8101",
         "http://127.0.0.1:8102",
@@ -52,6 +54,44 @@ SERVICE_POOLS: dict[str, list[str]] = {
     ],
 }
 
+
+def _load_service_pools() -> tuple[dict[str, list[str]], str]:
+    """Load dynamic local service ports selected by start-microservices-local.ps1.
+
+    Windows can reserve or block common development ports. The startup script
+    probes safe fallback ports and passes them through SERVICE_POOLS_JSON so the
+    gateway always knows where each replica is actually running.
+    """
+    raw_value = os.getenv("SERVICE_POOLS_JSON")
+    if not raw_value:
+        return DEFAULT_SERVICE_POOLS, "default-static-ports"
+
+    try:
+        parsed = json.loads(raw_value)
+    except json.JSONDecodeError:
+        return DEFAULT_SERVICE_POOLS, "invalid-env-json-using-defaults"
+
+    if not isinstance(parsed, dict):
+        return DEFAULT_SERVICE_POOLS, "invalid-env-shape-using-defaults"
+
+    pools: dict[str, list[str]] = {}
+    for service_name, nodes in parsed.items():
+        if not isinstance(service_name, str) or not isinstance(nodes, list):
+            return DEFAULT_SERVICE_POOLS, "invalid-env-node-shape-using-defaults"
+        node_urls = [node for node in nodes if isinstance(node, str) and node.startswith("http")]
+        if not node_urls:
+            return DEFAULT_SERVICE_POOLS, "empty-env-node-list-using-defaults"
+        pools[service_name] = node_urls
+
+    for required_service in DEFAULT_SERVICE_POOLS:
+        if required_service not in pools:
+            return DEFAULT_SERVICE_POOLS, "missing-required-service-using-defaults"
+
+    return pools, "SERVICE_POOLS_JSON"
+
+
+SERVICE_POOLS, SERVICE_POOLS_SOURCE = _load_service_pools()
+
 ROUTE_SERVICE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("/api/v1/auth", "auth-service"),
     ("/api/v1/data", "auth-service"),
@@ -61,6 +101,23 @@ ROUTE_SERVICE_PREFIXES: tuple[tuple[str, str], ...] = (
     ("/api/v1/inventory", "inventory-service"),
     ("/api/v1/notifications", "notification-service"),
 )
+
+API_INDEX_PAYLOAD = {
+    "message": "FinMark Enterprise Microservice API Gateway is running",
+    "note": "This is the API base URL. Open one of the available endpoints below.",
+    "health": "/api/v1/health",
+    "ready": "/api/v1/ready",
+    "service_info": "/api/v1/service-info",
+    "available_prefixes": [prefix for prefix, _ in ROUTE_SERVICE_PREFIXES],
+    "common_endpoints": {
+        "login": "POST /api/v1/auth/token",
+        "current_user": "GET /api/v1/auth/me",
+        "products": "GET /api/v1/inventory/products",
+        "checkout": "POST /api/v1/orders/checkout",
+        "admin_order_list": "GET /api/v1/orders",
+        "notifications": "GET /api/v1/notifications",
+    },
+}
 
 # These response headers are managed by the gateway/client transport and should
 # not be copied blindly from the upstream response.
@@ -95,7 +152,7 @@ _rr_lock = asyncio.Lock()
 
 app = FastAPI(
     title="FinMark Local Microservice API Gateway",
-    version="4.1.0-local-gateway-no-docker",
+    version="5.0.0-local-enterprise-gateway-no-docker",
 )
 
 app.add_middleware(
@@ -155,11 +212,17 @@ async def gateway_observability(request: Request, call_next):
 def root():
     return {
         "message": "FinMark Local API Gateway is running",
-        "mode": "no-docker-local-microservices",
+        "mode": "no-docker-local-enterprise-microservices",
         "health": "/api/v1/health",
         "ready": "/api/v1/ready",
         "service_info": "/api/v1/service-info",
     }
+
+
+@app.get("/api/v1")
+@app.get("/api/v1/")
+def api_index():
+    return API_INDEX_PAYLOAD
 
 
 @app.get("/api/v1/health")
@@ -168,6 +231,7 @@ def health():
         "status": "ok",
         "service": "local-api-gateway",
         "message": "Gateway is running. Use /api/v1/ready to check service nodes.",
+        "service_pools_source": SERVICE_POOLS_SOURCE,
     }
 
 
@@ -175,9 +239,13 @@ def health():
 def service_info():
     return {
         "service": "local-api-gateway",
-        "deployment_mode": "local-process-microservices-no-docker",
+        "deployment_mode": "local-enterprise-microservices-no-docker",
+        "architecture": "database-per-service",
+        "service_databases": ["auth", "order", "inventory", "notification"],
+        "message_queue": "outbox/local fallback; RabbitMQ in Docker/cloud mode",
         "target_replicas_per_microservice": 3,
         "backup_nodes_after_one_failure": 2,
+        "service_pools_source": SERVICE_POOLS_SOURCE,
         "service_pools": SERVICE_POOLS,
         "routing": {prefix: service for prefix, service in ROUTE_SERVICE_PREFIXES},
     }

@@ -1,12 +1,23 @@
 x-backend-env: &backend-env
   APP_ENV: production
-  DEPLOYMENT_MODE: microservices-3-node
+  ENTERPRISE_MICROSERVICES_ENABLED: 'true'
+  DEPLOYMENT_MODE: enterprise-microservices-database-per-service
   SERVICE_REPLICAS: 3
-  SECRET_KEY: replace-with-a-real-64-character-secret
+  SECRET_KEY: replace-with-a-real-64-character-user-jwt-secret
+  SERVICE_AUTH_SECRET: replace-with-a-real-64-character-service-jwt-secret
   FRONTEND_ORIGINS: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080
   FRONTEND_BASE_URL: http://localhost:5173
   ALLOWED_HOSTS: '*'
-  DATABASE_URL: mysql+pymysql://finmark_app:finmark_password_change_me@mysql:3306/finmark_db
+  AUTH_DATABASE_URL: mysql+pymysql://finmark_auth:finmark_auth_password@auth-mysql:3306/finmark_auth_db
+  ORDER_DATABASE_URL: mysql+pymysql://finmark_order:finmark_order_password@order-mysql:3306/finmark_order_db
+  INVENTORY_DATABASE_URL: mysql+pymysql://finmark_inventory:finmark_inventory_password@inventory-mysql:3306/finmark_inventory_db
+  NOTIFICATION_DATABASE_URL: mysql+pymysql://finmark_notification:finmark_notification_password@notification-mysql:3306/finmark_notification_db
+  INVENTORY_SERVICE_URL: http://microservice-gateway
+  RABBITMQ_URL: amqp://finmark:finmark_rabbit_password@rabbitmq:5672/%2F
+  EVENT_BUS_ENABLED: 'true'
+  OTEL_ENABLED: 'true'
+  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4317
+  OTEL_SERVICE_NAMESPACE: finmark
   AUTO_CREATE_DB: 'false'
   SEED_DEMO_DATA: 'false'
   DB_POOL_SIZE: 8
@@ -18,164 +29,226 @@ x-backend-env: &backend-env
   PRODUCT_CACHE_MAX_AGE_SECONDS: 60
   WEB_CONCURRENCY: 2
 
+x-mysql-command: &mysql-command
+  - --max_connections=350
+  - --innodb_buffer_pool_size=384M
+  - --innodb_flush_log_at_trx_commit=2
+  - --skip-name-resolve
+
 x-microservice-common: &microservice-common
   build:
     context: .
     dockerfile: deployment/Dockerfile.microservice
-  image: finmark-platform-microservice:local
+  image: finmark-platform-enterprise-microservice:local
   depends_on:
     db-init:
       condition: service_completed_successfully
+    rabbitmq:
+      condition: service_healthy
   expose:
     - '8000'
   restart: unless-stopped
 
 services:
-  mysql:
+  auth-mysql:
     image: mysql:8.4
     environment:
-      MYSQL_DATABASE: finmark_db
-      MYSQL_USER: finmark_app
-      MYSQL_PASSWORD: finmark_password_change_me
-      MYSQL_ROOT_PASSWORD: root_password_change_me
-    command:
-      - --max_connections=700
-      - --innodb_buffer_pool_size=768M
-      - --innodb_flush_log_at_trx_commit=2
-      - --skip-name-resolve
+      MYSQL_DATABASE: finmark_auth_db
+      MYSQL_USER: finmark_auth
+      MYSQL_PASSWORD: finmark_auth_password
+      MYSQL_ROOT_PASSWORD: root_auth_password
+    command: *mysql-command
     volumes:
-      - finmark_microservice_mysql_data:/var/lib/mysql
+      - finmark_auth_mysql_data:/var/lib/mysql
     healthcheck:
-      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-proot_password_change_me']
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-proot_auth_password']
       interval: 10s
       timeout: 5s
-      retries: 15
+      retries: 20
+    restart: unless-stopped
+
+  order-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: finmark_order_db
+      MYSQL_USER: finmark_order
+      MYSQL_PASSWORD: finmark_order_password
+      MYSQL_ROOT_PASSWORD: root_order_password
+    command: *mysql-command
+    volumes:
+      - finmark_order_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-proot_order_password']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  inventory-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: finmark_inventory_db
+      MYSQL_USER: finmark_inventory
+      MYSQL_PASSWORD: finmark_inventory_password
+      MYSQL_ROOT_PASSWORD: root_inventory_password
+    command: *mysql-command
+    volumes:
+      - finmark_inventory_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-proot_inventory_password']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  notification-mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: finmark_notification_db
+      MYSQL_USER: finmark_notification
+      MYSQL_PASSWORD: finmark_notification_password
+      MYSQL_ROOT_PASSWORD: root_notification_password
+    command: *mysql-command
+    volumes:
+      - finmark_notification_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', '127.0.0.1', '-u', 'root', '-proot_notification_password']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: finmark
+      RABBITMQ_DEFAULT_PASS: finmark_rabbit_password
+    ports:
+      - '15672:15672'
+    volumes:
+      - finmark_rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - '16686:16686'
+      - '4317:4317'
     restart: unless-stopped
 
   db-init:
     build:
       context: .
       dockerfile: deployment/Dockerfile.microservice
-    image: finmark-platform-microservice:local
+    image: finmark-platform-enterprise-microservice:local
     depends_on:
-      mysql:
+      auth-mysql:
+        condition: service_healthy
+      order-mysql:
+        condition: service_healthy
+      inventory-mysql:
+        condition: service_healthy
+      notification-mysql:
         condition: service_healthy
     environment:
       <<: *backend-env
       AUTO_CREATE_DB: 'true'
       SEED_DEMO_DATA: 'true'
+      EVENT_BUS_ENABLED: 'false'
+      OTEL_ENABLED: 'false'
       SERVICE_INSTANCE_NAME: db-init
-    command: ['python', '-m', 'backend.scripts.init_service_database']
+    command: ['python', '-m', 'backend.enterprise.scripts.init_enterprise_databases']
     restart: 'no'
 
   auth-service-1:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.auth_main:app
-      SERVICE_INSTANCE_NAME: auth-service-1
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.auth_main:app, SERVICE_INSTANCE_NAME: auth-service-1 }
   auth-service-2:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.auth_main:app
-      SERVICE_INSTANCE_NAME: auth-service-2
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.auth_main:app, SERVICE_INSTANCE_NAME: auth-service-2 }
   auth-service-3:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.auth_main:app
-      SERVICE_INSTANCE_NAME: auth-service-3
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.auth_main:app, SERVICE_INSTANCE_NAME: auth-service-3 }
 
   order-service-1:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.order_main:app
-      SERVICE_INSTANCE_NAME: order-service-1
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.order_main:app, SERVICE_INSTANCE_NAME: order-service-1 }
   order-service-2:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.order_main:app
-      SERVICE_INSTANCE_NAME: order-service-2
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.order_main:app, SERVICE_INSTANCE_NAME: order-service-2 }
   order-service-3:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.order_main:app
-      SERVICE_INSTANCE_NAME: order-service-3
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.order_main:app, SERVICE_INSTANCE_NAME: order-service-3 }
 
   inventory-service-1:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.inventory_main:app
-      SERVICE_INSTANCE_NAME: inventory-service-1
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.inventory_main:app, SERVICE_INSTANCE_NAME: inventory-service-1 }
   inventory-service-2:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.inventory_main:app
-      SERVICE_INSTANCE_NAME: inventory-service-2
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.inventory_main:app, SERVICE_INSTANCE_NAME: inventory-service-2 }
   inventory-service-3:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.inventory_main:app
-      SERVICE_INSTANCE_NAME: inventory-service-3
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.inventory_main:app, SERVICE_INSTANCE_NAME: inventory-service-3 }
 
   notification-service-1:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.notification_main:app
-      SERVICE_INSTANCE_NAME: notification-service-1
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.notification_main:app, SERVICE_INSTANCE_NAME: notification-service-1 }
   notification-service-2:
     <<: *microservice-common
-    environment:
-      <<: *backend-env
-      SERVICE_MODULE: backend.microservices.notification_main:app
-      SERVICE_INSTANCE_NAME: notification-service-2
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.notification_main:app, SERVICE_INSTANCE_NAME: notification-service-2 }
   notification-service-3:
     <<: *microservice-common
+    environment: { <<: *backend-env, SERVICE_MODULE: backend.microservices.notification_main:app, SERVICE_INSTANCE_NAME: notification-service-3 }
+
+  notification-worker-1:
+    build:
+      context: .
+      dockerfile: deployment/Dockerfile.microservice
+    image: finmark-platform-enterprise-microservice:local
+    depends_on:
+      notification-mysql:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      db-init:
+        condition: service_completed_successfully
     environment:
       <<: *backend-env
-      SERVICE_MODULE: backend.microservices.notification_main:app
-      SERVICE_INSTANCE_NAME: notification-service-3
+      SERVICE_INSTANCE_NAME: notification-worker-1
+    command: ['python', '-m', 'backend.enterprise.scripts.notification_consumer']
+    restart: unless-stopped
 
   microservice-gateway:
     image: nginx:1.27-alpine
     depends_on:
-      auth-service-1:
-        condition: service_healthy
-      auth-service-2:
-        condition: service_healthy
-      auth-service-3:
-        condition: service_healthy
-      order-service-1:
-        condition: service_healthy
-      order-service-2:
-        condition: service_healthy
-      order-service-3:
-        condition: service_healthy
-      inventory-service-1:
-        condition: service_healthy
-      inventory-service-2:
-        condition: service_healthy
-      inventory-service-3:
-        condition: service_healthy
-      notification-service-1:
-        condition: service_healthy
-      notification-service-2:
-        condition: service_healthy
-      notification-service-3:
-        condition: service_healthy
+      auth-service-1: { condition: service_healthy }
+      auth-service-2: { condition: service_healthy }
+      auth-service-3: { condition: service_healthy }
+      order-service-1: { condition: service_healthy }
+      order-service-2: { condition: service_healthy }
+      order-service-3: { condition: service_healthy }
+      inventory-service-1: { condition: service_healthy }
+      inventory-service-2: { condition: service_healthy }
+      inventory-service-3: { condition: service_healthy }
+      notification-service-1: { condition: service_healthy }
+      notification-service-2: { condition: service_healthy }
+      notification-service-3: { condition: service_healthy }
     ports:
-      - '8000:80'
+      - '${FINMARK_GATEWAY_PORT:-8000}:80'
     volumes:
       - ./deployment/nginx.microservices.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
 
 volumes:
-  finmark_microservice_mysql_data:
+  finmark_auth_mysql_data:
+  finmark_order_mysql_data:
+  finmark_inventory_mysql_data:
+  finmark_notification_mysql_data:
+  finmark_rabbitmq_data:

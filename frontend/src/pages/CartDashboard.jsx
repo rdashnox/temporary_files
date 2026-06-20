@@ -234,7 +234,7 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
             <div className="page-title-row">
               <div>
                 <h1>Product Dashboard</h1>
-                <p>Available for Admin, Staff, Viewer, and User roles. Browse products, monitor stock, and create persisted orders.</p>
+                <p>Available for Administrator, Admin, Staff, Viewer, User, and Customer roles. Browse products, monitor stock, and create persisted orders.</p>
               </div>
               <button className="primary-btn add-sale-btn" type="button" onClick={() => document.getElementById('storefront')?.scrollIntoView({ behavior: 'smooth' })}>+ New Product Order</button>
             </div>
@@ -260,6 +260,11 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
                 <h2>{order.order_id}</h2>
                 <p>{order.message}</p>
                 <strong>Total: {currency.format(order.summary.total)}</strong>
+                {canOpenAdmin && (
+                  <button className="light-btn small" type="button" onClick={() => onOpenAdmin('orders')}>
+                    View in Admin Order List
+                  </button>
+                )}
               </section>
             )}
 

@@ -8,7 +8,7 @@ const TOKEN_KEYS = {
 };
 
 export const BACKEND_OFFLINE_MESSAGE =
-  'Backend API is offline. Start FastAPI on http://127.0.0.1:8000, then refresh this page.';
+  `Backend API is offline. Start the backend or microservice gateway for ${API_BASE_URL}, then refresh this page.`;
 
 export class BackendOfflineError extends Error {
   constructor(message = BACKEND_OFFLINE_MESSAGE) {
@@ -53,7 +53,7 @@ export const clearTokens = () => {
 };
 
 const makeBackendOfflineError = () => new BackendOfflineError(
-  `${BACKEND_OFFLINE_MESSAGE} Command: python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000`,
+  `${BACKEND_OFFLINE_MESSAGE} Commands: .\start-backend.ps1 or .\start-microservices-local.ps1`,
 );
 
 let refreshPromise = null;
@@ -272,14 +272,28 @@ export const getProducts = async ({ forceRefresh = false } = {}) => {
   return productCache.promise;
 };
 
+export const ORDER_CREATED_EVENT = 'finmark:order-created';
+export const LAST_ORDER_NUMBER_KEY = 'finmark:last-order-number';
+
+const rememberCreatedOrder = (order) => {
+  if (typeof window === 'undefined' || !order) return;
+  const orderNumber = order.order_id || order.order_number || '';
+  if (orderNumber) {
+    window.localStorage.setItem(LAST_ORDER_NUMBER_KEY, orderNumber);
+  }
+  window.dispatchEvent(new CustomEvent(ORDER_CREATED_EVENT, { detail: order }));
+};
+
 export const checkoutCart = async (payload) => {
   const idempotencyKey = payload.idempotency_key || createClientRequestId('checkout');
   const response = await authFetch('/orders/checkout', {
     method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
+    headers: { 'Idempotency-Key': idempotencyKey, 'Cache-Control': 'no-cache' },
     body: JSON.stringify({ ...payload, idempotency_key: idempotencyKey }),
   });
-  return parseResponse(response);
+  const result = await parseResponse(response);
+  rememberCreatedOrder(result);
+  return result;
 };
 
 export const getNotifications = async (params = {}) => {
@@ -294,7 +308,14 @@ export const verifySession = async () => {
 };
 
 export const getCurrentDatabaseUser = async () => {
-  const response = await authFetch('/database/me');
+  // Enterprise microservice mode exposes the current user through the Auth Service.
+  // Older monolith builds used /database/me, so keep a fallback for compatibility.
+  let response = await authFetch('/auth/me');
+
+  if (response.status === 404) {
+    response = await authFetch('/database/me');
+  }
+
   return parseResponse(response);
 };
 
@@ -312,13 +333,78 @@ export const getDatabaseSummary = async () => {
   return parseResponse(response);
 };
 
+const ENTITY_ENDPOINTS = {
+  // Enterprise microservice mode: orders are owned by the Order Service.
+  // The Admin CRUD list must read from the dedicated Order Service, not the
+  // legacy Auth/database routes. Compatibility fallback is still available.
+  orders: '/orders',
+};
+
+const getEntityEndpoint = (entity, id = null) => {
+  const base = ENTITY_ENDPOINTS[entity] || `/database/${entity}`;
+  return id === null || id === undefined ? base : `${base}/${id}`;
+};
+
+const normalizeListResponse = (value) => {
+  if (Array.isArray(value)) return value;
+  if (Array.isArray(value?.items)) return value.items;
+  if (Array.isArray(value?.data)) return value.data;
+  if (Array.isArray(value?.records)) return value.records;
+  return [];
+};
+
+export const listOrdersForAdmin = async (params = {}) => {
+  // Add a cache-buster so the Admin order list always re-reads the latest
+  // checked-out orders from the Order Service. This prevents browser/proxy cache
+  // or stale gateway responses from showing an empty list after checkout.
+  const requestParams = { ...params, _ts: Date.now() };
+  const query = toQueryString(requestParams);
+  const endpoints = ['/orders', '/orders/', '/database/orders', '/database/orders/'];
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await authFetch(`${endpoint}${query}`, {
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+      });
+      const data = normalizeListResponse(await parseResponse(response));
+      // If the canonical Order Service returns rows, use it immediately. If it
+      // returns an empty list, still try compatibility routes before giving up.
+      if (data.length > 0 || endpoint.startsWith('/database')) return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  // Last-resort fallback: if old/corrupted demo rows make the unfiltered list
+  // fail, try the Order Service latest endpoint so the Admin dashboard can still
+  // show recent orders while the user runs repair-order-statuses.ps1.
+  if (!params.search) {
+    for (const endpoint of ['/orders/latest', '/database/orders/latest']) {
+      try {
+        const response = await authFetch(`${endpoint}?limit=${requestParams.limit || 50}&_ts=${requestParams._ts}`, {
+          headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+        });
+        const data = normalizeListResponse(await parseResponse(response));
+        if (data.length > 0) return data;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+  }
+
+  if (lastError) throw lastError;
+  return [];
+};
+
 export const listEntity = async (entity, params = {}) => {
-  const response = await authFetch(`/database/${entity}${toQueryString(params)}`);
-  return parseResponse(response);
+  if (entity === 'orders') return listOrdersForAdmin(params);
+  const response = await authFetch(`${getEntityEndpoint(entity)}${toQueryString(params)}`);
+  return normalizeListResponse(await parseResponse(response));
 };
 
 export const createEntity = async (entity, payload) => {
-  const response = await authFetch(`/database/${entity}`, {
+  const response = await authFetch(getEntityEndpoint(entity), {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -326,7 +412,28 @@ export const createEntity = async (entity, payload) => {
 };
 
 export const updateEntity = async (entity, id, payload) => {
-  const response = await authFetch(`/database/${entity}/${id}`, {
+  // Orders are owned by the enterprise Order Service. Try the canonical route
+  // first, then compatibility routes. This prevents Admin Edit from failing
+  // when the local gateway, Nginx gateway, or a browser cache still points to
+  // one of the older /database/orders paths.
+  if (entity === 'orders') {
+    const endpoints = [`/orders/${id}`, `/database/orders/${id}`];
+    let lastError = null;
+    for (const endpoint of endpoints) {
+      try {
+        const response = await authFetch(endpoint, {
+          method: 'PUT',
+          body: JSON.stringify(payload),
+        });
+        return await parseResponse(response);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError || new Error('Unable to update order.');
+  }
+
+  const response = await authFetch(getEntityEndpoint(entity, id), {
     method: 'PUT',
     body: JSON.stringify(payload),
   });
@@ -334,6 +441,6 @@ export const updateEntity = async (entity, id, payload) => {
 };
 
 export const deleteEntity = async (entity, id) => {
-  const response = await authFetch(`/database/${entity}/${id}`, { method: 'DELETE' });
+  const response = await authFetch(getEntityEndpoint(entity, id), { method: 'DELETE' });
   return parseResponse(response);
 };

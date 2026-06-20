@@ -33,6 +33,78 @@ def create_service_app(
     readiness, CORS, compression, tracing, and database-pool behavior.
     """
 
+    enterprise_mode_requested = (
+        settings.enterprise_microservices_enabled
+        or settings.has_full_enterprise_database_urls
+        or settings.db_user.strip().lower() == "finmark_app"
+    )
+
+    if service_slug == "platform-monolith" and enterprise_mode_requested:
+        app = FastAPI(
+            title="FinMark Enterprise Microservices Guard API",
+            version=version,
+            description=(
+                "This project is configured for the full enterprise microservice mode. "
+                "Start the gateway and service replicas instead of backend.main:app."
+            ),
+        )
+
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=settings.frontend_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+        guidance = {
+            "status": "wrong_start_command",
+            "service": service_slug,
+            "message": (
+                "You started the legacy single-app backend with backend.main:app, "
+                "but .env is configured for the full enterprise 4-database microservice mode."
+            ),
+            "why_it_failed_before": (
+                "backend.main:app uses the legacy DB_NAME value, commonly finmark_db. "
+                "The least-privilege finmark_app user is intentionally granted only to "
+                "finmark_auth_db, finmark_order_db, finmark_inventory_db, and "
+                "finmark_notification_db."
+            ),
+            "correct_commands": [
+                ".\\stop-microservices-local.ps1",
+                ".\\repair-enterprise-env.ps1",
+                ".\\verify-enterprise-mysql-databases.ps1",
+                ".\\seed-enterprise-mysql.ps1",
+                ".\\start-microservices-local-mysql.ps1",
+                ".\\start-frontend.ps1",
+            ],
+            "do_not_use_for_enterprise_mode": (
+                "python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000"
+            ),
+            "legacy_override": (
+                "If you intentionally want the old monolith, run .\\start-backend.ps1 -Legacy "
+                "and grant DB_USER access to DB_NAME, or change DB_NAME to a database that user can access."
+            ),
+        }
+
+        @app.get("/")
+        def enterprise_mode_root():
+            return guidance
+
+        @app.get("/api/v1/health")
+        def enterprise_mode_health():
+            return guidance
+
+        @app.get("/api/v1/service-info")
+        def enterprise_mode_service_info():
+            return guidance
+
+        @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+        def enterprise_mode_wrong_command(path: str):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=guidance)
+
+        return app
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         anyio.to_thread.current_default_thread_limiter().total_tokens = settings.threadpool_tokens

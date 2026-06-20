@@ -1,13 +1,13 @@
-from ..app_factory import create_service_app
-from ..routes import auth, data, database_entities
+from ..enterprise.app_factory import create_enterprise_service_app
+from ..enterprise.routes import auth, data, database_compat
 
-app = create_service_app(
+app = create_enterprise_service_app(
     service_name="Auth/Login",
     service_slug="auth-service",
+    service_key="auth",
     router_specs=(
         (auth.router, "/api/v1/auth", ("auth-service",)),
-        # Compatibility endpoints used by the current frontend session and admin screens.
         (data.router, "/api/v1/data", ("auth-service", "session")),
-        (database_entities.router, "/api/v1/database", ("auth-service", "admin-compatibility")),
+        (database_compat.router, "/api/v1/database", ("auth-service", "database-compat")),
     ),
 )

@@ -86,3 +86,26 @@ curl http://127.0.0.1:8000/api/v1/service-info
 ## Production recommendation
 
 For actual deployment, install Docker Desktop locally or use a VPS/cloud server with Docker Engine. Docker/Nginx is still the cleaner production deployment because it manages networking, restart policies, and container isolation better than local PowerShell processes.
+
+## Windows `[WinError 10013]` Socket Fix
+
+If Windows blocks the gateway or service ports, run:
+
+```powershell
+.\stop-microservices-local.ps1
+.\start-microservices-local.ps1
+```
+
+The local startup script now probes ports before starting Uvicorn. If `8000`, `8101`, `8201`, `8301`, or `8401` are blocked/reserved, it automatically uses safe fallback ports and writes the selected API URL to:
+
+```text
+frontend/.env.local
+```
+
+To diagnose blocked/reserved ports, run:
+
+```powershell
+.\diagnose-windows-ports.ps1
+```
+
+Then restart the frontend so Vite reads the updated `.env.local` file.

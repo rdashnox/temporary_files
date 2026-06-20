@@ -78,6 +78,22 @@ class Settings:
     deployment_mode: str
     service_replicas: int
     service_instance_name: str
+    enterprise_microservices_enabled: bool
+    auth_database_url: str | None
+    order_database_url: str | None
+    inventory_database_url: str | None
+    notification_database_url: str | None
+
+    @property
+    def has_full_enterprise_database_urls(self) -> bool:
+        return all(
+            [
+                self.auth_database_url,
+                self.order_database_url,
+                self.inventory_database_url,
+                self.notification_database_url,
+            ]
+        )
 
     @property
     def resolved_database_url(self) -> str:
@@ -138,6 +154,11 @@ def get_settings() -> Settings:
         deployment_mode=os.getenv("DEPLOYMENT_MODE", "single-app"),
         service_replicas=_get_int_env("SERVICE_REPLICAS", 3),
         service_instance_name=os.getenv("SERVICE_INSTANCE_NAME", ""),
+        enterprise_microservices_enabled=_get_bool_env("ENTERPRISE_MICROSERVICES_ENABLED", False),
+        auth_database_url=os.getenv("AUTH_DATABASE_URL") or None,
+        order_database_url=os.getenv("ORDER_DATABASE_URL") or None,
+        inventory_database_url=os.getenv("INVENTORY_DATABASE_URL") or None,
+        notification_database_url=os.getenv("NOTIFICATION_DATABASE_URL") or None,
     )
 
 

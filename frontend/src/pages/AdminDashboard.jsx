@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BACKEND_OFFLINE_MESSAGE, checkBackendHealth, createEntity, deleteEntity, getDatabaseSummary, isAuthRequiredError, isBackendOfflineError, listEntity, updateEntity } from '../api/client.js';
+import { BACKEND_OFFLINE_MESSAGE, LAST_ORDER_NUMBER_KEY, ORDER_CREATED_EVENT, checkBackendHealth, createEntity, deleteEntity, getDatabaseSummary, isAuthRequiredError, isBackendOfflineError, listEntity, updateEntity } from '../api/client.js';
 
 const currency = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -197,6 +197,8 @@ const roleNames = (roles = []) => roles
   })
   .filter(Boolean);
 
+const ADMIN_FULL_ACCESS_ROLES = ['admin', 'administrator', 'super admin', 'superadmin', 'super user', 'superuser'];
+
 const permissionAliases = {
   'users.read': ['users.manage'],
   'users.manage': ['users.create', 'users.update', 'users.delete'],
@@ -216,6 +218,11 @@ const permissionAliases = {
 };
 
 const hasPermission = (user, permission) => {
+  // Admin/Administrator must be able to see every Admin Dashboard module even
+  // when old-role migration did not copy every granular permission row.
+  const roles = new Set(roleNames(user?.roles || []).map((role) => role.toLowerCase()));
+  if (ADMIN_FULL_ACCESS_ROLES.some((role) => roles.has(role))) return true;
+
   const permissions = new Set(
     (user?.permissions || []).map((item) => {
       if (typeof item === 'string') return item.toLowerCase();
@@ -286,7 +293,7 @@ const cleanPayload = (payload) => {
   );
 };
 
-export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts, canOpenProducts = false }) {
+export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts, canOpenProducts = false, initialEntity = null }) {
   const user = useMemo(() => normalizeUser(rawUser), [rawUser]);
   const permissionSignature = useMemo(
     () => [
@@ -321,7 +328,14 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
   const config = entityConfigs[activeEntity] || entityConfigs.roles;
   const canManage = hasPermission(user, config.managePermission);
 
-  const backendOfflineText = `${BACKEND_OFFLINE_MESSAGE} Run: python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000`;
+  useEffect(() => {
+    if (!initialEntity || !entityConfigs[initialEntity]) return;
+    if (!hasPermission(user, entityConfigs[initialEntity].permission)) return;
+    setActiveEntity(initialEntity);
+    setQuery('');
+  }, [initialEntity, user, permissionSignature]);
+
+  const backendOfflineText = `${BACKEND_OFFLINE_MESSAGE} Run: ./start-microservices-local-mysql.ps1 then ./start-frontend.ps1`;
 
   const stopForAuthError = useCallback((err) => {
     if (!isAuthRequiredError(err)) return false;
@@ -373,8 +387,15 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setLoading(true);
     setError('');
     try {
-      const data = await listEntity(entity, { limit: entity === 'audit-logs' ? 100 : 50, search });
-      setRecords(data);
+      let data = await listEntity(entity, { limit: entity === 'audit-logs' ? 100 : 50, search });
+      if (entity === 'orders' && Array.isArray(data) && data.length === 0 && !safeString(search).trim()) {
+        const lastOrderNumber = typeof window !== 'undefined' ? window.localStorage.getItem(LAST_ORDER_NUMBER_KEY) : '';
+        if (lastOrderNumber) {
+          const retryData = await listEntity('orders', { limit: 50, search: lastOrderNumber });
+          if (Array.isArray(retryData) && retryData.length > 0) data = retryData;
+        }
+      }
+      setRecords(Array.isArray(data) ? data : []);
     } catch (err) {
       if (stopForAuthError(err)) return;
       if (isBackendOfflineError(err)) setBackendOnline(false);
@@ -405,6 +426,21 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
       }));
     }
   }, [ensureBackendOnline, stopForAuthError]);
+
+  useEffect(() => {
+    const handleOrderCreated = (event) => {
+      if (authStoppedRef.current) return;
+      const orderNumber = event?.detail?.order_id || event?.detail?.order_number || '';
+      setActiveEntity('orders');
+      setQuery('');
+      setNotice(orderNumber ? `Order ${orderNumber} was created. Reloading Manage Order List...` : 'Order was created. Reloading Manage Order List...');
+      loadEntity('orders', '');
+      loadSummary();
+    };
+
+    window.addEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
+    return () => window.removeEventListener(ORDER_CREATED_EVENT, handleOrderCreated);
+  }, [loadEntity, loadSummary]);
 
   useEffect(() => {
     let alive = true;
@@ -483,17 +519,32 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
 
   const buildPayload = () => {
     if (activeEntity === 'orders') {
-      const items = form.items_json.trim() ? JSON.parse(form.items_json) : [];
-      return cleanPayload({
-        customer_name: form.customer_name,
-        delivery_address: form.delivery_address,
-        payment_method: form.payment_method,
-        status: form.status,
+      let items = [];
+      try {
+        items = form.items_json.trim() ? JSON.parse(form.items_json) : [];
+      } catch {
+        throw makeValidationError(['Order items JSON is invalid. Use a JSON array with product_id, product_name, quantity, and unit_price.']);
+      }
+      if (!Array.isArray(items)) {
+        throw makeValidationError(['Order items JSON must be an array.']);
+      }
+      const payload = cleanPayload({
+        customer_name: safeString(form.customer_name).trim(),
+        delivery_address: safeString(form.delivery_address).trim(),
+        payment_method: safeString(form.payment_method).trim() || 'Cash on Delivery',
+        status: safeString(form.status).trim().toUpperCase() || 'NEW',
         discount: Number(form.discount || 0),
         shipping_fee: Number(form.shipping_fee || 0),
         tax: Number(form.tax || 0),
-        items,
+        items: items.map((item) => ({
+          product_id: Number(item.product_id),
+          product_name: safeString(item.product_name || item.name).trim(),
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price),
+        })),
       });
+      validateRequiredFields(payload, [['customer_name', 'Customer name'], ['delivery_address', 'Delivery address']]);
+      return payload;
     }
 
     if (activeEntity === 'reports') {

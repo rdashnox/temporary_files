@@ -196,9 +196,11 @@ def init_db() -> None:
         print("  DB_HOST=127.0.0.1")
         print("  DB_PORT=3306")
         print("  DB_NAME=finmark_db")
-        print("  DB_USER=root")
-        print("  DB_PASSWORD=your_real_mysql_password")
-        print("Manual fallback: run backend/scripts/enterprise_scale_migration.sql in MySQL Workbench.\n")
+        print("  DB_USER=<your mysql app user or root>")
+        print("  DB_PASSWORD=<that user's real password>")
+        print("If you are using the full enterprise 4-database mode, do not start backend.main directly.")
+        print("Use: .\\start-microservices-local-mysql.ps1")
+        print("Manual fallback for legacy mode: run backend/scripts/enterprise_scale_migration.sql in MySQL Workbench.\n")
         raise exc
     except SQLAlchemyError as exc:
         print("\nDatabase schema startup failed.")

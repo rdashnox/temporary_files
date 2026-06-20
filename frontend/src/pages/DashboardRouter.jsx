@@ -25,6 +25,7 @@ export default function DashboardRouter({ user: rawUser, onLogout }) {
   }, [canViewAdmin, canViewProducts]);
 
   const [activeDashboard, setActiveDashboard] = useState(resolveDashboard);
+  const [requestedAdminEntity, setRequestedAdminEntity] = useState(null);
 
   useEffect(() => {
     const handleNavigation = () => setActiveDashboard(resolveDashboard());
@@ -36,9 +37,13 @@ export default function DashboardRouter({ user: rawUser, onLogout }) {
     setActiveDashboard(resolveDashboard());
   }, [resolveDashboard]);
 
-  const openDashboard = useCallback((dashboard) => {
+  const openDashboard = useCallback((dashboard, options = {}) => {
     if (dashboard === 'admin' && !canViewAdmin) return;
     if (dashboard === 'products' && !canViewProducts) return;
+
+    if (dashboard === 'admin') {
+      setRequestedAdminEntity(options.entity || null);
+    }
 
     const targetPath = dashboard === 'admin' ? '/admin' : '/products';
     window.history.pushState({}, '', targetPath);
@@ -52,6 +57,7 @@ export default function DashboardRouter({ user: rawUser, onLogout }) {
         onLogout={onLogout}
         onOpenProducts={() => openDashboard('products')}
         canOpenProducts={canViewProducts}
+        initialEntity={requestedAdminEntity}
       />
     );
   }
@@ -60,7 +66,7 @@ export default function DashboardRouter({ user: rawUser, onLogout }) {
     <CartDashboard
       user={user}
       onLogout={onLogout}
-      onOpenAdmin={() => openDashboard('admin')}
+      onOpenAdmin={(entity) => openDashboard('admin', { entity })}
       canOpenAdmin={canViewAdmin}
     />
   );

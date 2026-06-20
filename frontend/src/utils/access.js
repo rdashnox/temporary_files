@@ -1,6 +1,7 @@
-export const PRODUCT_DASHBOARD_ROLES = ['admin', 'staff', 'viewer', 'user', 'customer'];
-export const ADMIN_DASHBOARD_ROLES = ['admin', 'manager'];
+export const PRODUCT_DASHBOARD_ROLES = ['administrator', 'admin', 'super admin', 'superadmin', 'super user', 'superuser', 'manager', 'staff', 'viewer', 'user', 'customer'];
+export const ADMIN_DASHBOARD_ROLES = ['administrator', 'admin', 'super admin', 'superadmin', 'super user', 'superuser', 'manager'];
 export const PRODUCT_ONLY_ROLES = ['customer'];
+export const FULL_ACCESS_ADMIN_ROLES = ['administrator', 'admin', 'super admin', 'superadmin', 'super user', 'superuser'];
 
 export const normalizeUser = (user) => {
   if (!user) return { username: 'User', email: '', roles: [], permissions: [] };
@@ -50,6 +51,12 @@ export const PERMISSION_ALIASES = {
   'roles.manage': ['roles.create', 'roles.update', 'roles.delete'],
   'permissions.manage': ['permissions.create', 'permissions.update', 'permissions.delete'],
   'orders.manage': ['orders.create', 'orders.update', 'orders.delete'],
+  'inventory.read': ['products.read', 'dashboard.products', 'product_dashboard.access'],
+  'inventory.manage': ['inventory.create', 'inventory.update', 'inventory.delete', 'products.manage', 'products.create', 'products.update', 'products.delete'],
+  'products.read': ['inventory.read', 'dashboard.products', 'product_dashboard.access'],
+  'products.manage': ['products.create', 'products.update', 'products.delete', 'inventory.manage'],
+  'dashboard.products': ['product_dashboard.access', 'inventory.read', 'products.read'],
+  'dashboard.admin': ['users.manage', 'roles.manage', 'permissions.manage'],
   'reports.manage': ['reports.create', 'reports.update', 'reports.delete', 'reports.generate'],
   'planning.read': ['planning_requests.read'],
   'planning.manage': ['planning.create', 'planning.update', 'planning.delete', 'planning.approve', 'planning.reject', 'planning_requests.create', 'planning_requests.update', 'planning_requests.delete', 'planning_requests.approve', 'planning_requests.reject'],
@@ -58,6 +65,8 @@ export const PERMISSION_ALIASES = {
 };
 
 export const hasAnyPermission = (user, allowedPermissions = []) => {
+  if (hasAnyRole(user, FULL_ACCESS_ADMIN_ROLES)) return true;
+
   const permissions = new Set(getPermissionCodes(user));
   const acceptedPermissions = allowedPermissions.flatMap((permission) => {
     const key = permission.toLowerCase();
@@ -69,10 +78,14 @@ export const hasAnyPermission = (user, allowedPermissions = []) => {
 
 export const canOpenProductDashboard = (user) => {
   // Product dashboard is the safe default workspace for authenticated accounts.
-  // This explicitly includes Admin, Staff, Viewer, User, and Customer roles.
+  // Administrator/Admin users must also open this dashboard, even when their role
+  // name is stored as "Administrator" after migration from the legacy database.
   const normalized = normalizeUser(user);
   const roles = getRoleNames(normalized);
-  return Boolean(normalized.username) && (roles.length === 0 || hasAnyRole(normalized, PRODUCT_DASHBOARD_ROLES));
+  if (!normalized.username) return false;
+  if (hasAnyRole(normalized, PRODUCT_DASHBOARD_ROLES)) return true;
+  if (hasAnyPermission(normalized, ['inventory.read', 'inventory.manage', 'products.read', 'products.manage', 'dashboard.products', 'product_dashboard.access', 'users.manage'])) return true;
+  return roles.length === 0;
 };
 
 export const canOpenAdminDashboard = (user) => {

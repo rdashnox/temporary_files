@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Header, Query, status
+from fastapi import APIRouter, Depends, Header, Path, Query, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
@@ -114,19 +114,19 @@ def order_debug_summary(current_user: dict = Depends(get_current_user), db: Sess
 
 
 @router.get("/{order_id}")
-def get_order(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_order_db)):
+def get_order(order_id: int = Path(..., ge=1), current_user: dict = Depends(get_current_user), db: Session = Depends(get_order_db)):
     require_permission(current_user, "orders.read")
     return order_service.get_order(db, order_id)
 
 
 @router.put("/{order_id}")
 @router.patch("/{order_id}", include_in_schema=False)
-def update_order(order_id: int, order_update: OrderUpdate, current_user: dict = Depends(get_current_user), db: Session = Depends(get_order_db)):
+def update_order(order_id: int = Path(..., ge=1), order_update: OrderUpdate = ..., current_user: dict = Depends(get_current_user), db: Session = Depends(get_order_db)):
     require_permission(current_user, "orders.manage")
     return order_service.update_order(db, order_id, order_update, current_user)
 
 
 @router.delete("/{order_id}")
-def delete_order(order_id: int, current_user: dict = Depends(get_current_user), db: Session = Depends(get_order_db)):
+def delete_order(order_id: int = Path(..., ge=1), current_user: dict = Depends(get_current_user), db: Session = Depends(get_order_db)):
     require_permission(current_user, "orders.manage")
     return order_service.delete_order(db, order_id, current_user)

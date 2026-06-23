@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { requireEmail, validateOrderItems } from '../utils/validation.js';
 import { BACKEND_OFFLINE_MESSAGE, LAST_ORDER_NUMBER_KEY, ORDER_CREATED_EVENT, checkBackendHealth, createEntity, deleteEntity, getDatabaseSummary, isAuthRequiredError, isBackendOfflineError, listEntity, updateEntity } from '../api/client.js';
+import { showApiErrorToast, showErrorToast, showInfoToast, showSuccessToast, showValidationToast } from '../utils/toast.js';
 
 const currency = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -324,6 +326,7 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
   const authStoppedRef = useRef(false);
   const summaryLoadedRef = useRef(false);
   const lookupLoadedRef = useRef(false);
+  const editPanelRef = useRef(null);
 
   const config = entityConfigs[activeEntity] || entityConfigs.roles;
   const canManage = hasPermission(user, config.managePermission);
@@ -342,7 +345,9 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     authStoppedRef.current = true;
     setLoading(false);
     setSaving(false);
-    setError('Your session expired. Please log in again.');
+    const message = 'Your session expired. Please log in again.';
+    setError(message);
+    showErrorToast(message, { toastId: 'admin-auth-expired' });
     return true;
   }, []);
 
@@ -353,6 +358,24 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setNotice('');
   }, [activeEntity]);
 
+  const focusEditWindow = useCallback(() => {
+    window.setTimeout(() => {
+      const panel = editPanelRef.current;
+      if (!panel) return;
+      panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      panel.focus({ preventScroll: true });
+      const firstField = panel.querySelector('input, select, textarea, button');
+      if (firstField && typeof firstField.focus === 'function') {
+        firstField.focus({ preventScroll: true });
+      }
+    }, 80);
+  }, []);
+
+  const showEditNotification = useCallback((message) => {
+    setNotice(message);
+    showSuccessToast(message, { toastId: 'order-edit-notification', autoClose: 6500 });
+  }, []);
+
   const ensureBackendOnline = useCallback(async () => {
     if (backendOnline === true) return true;
 
@@ -361,6 +384,7 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     if (!ok) {
       setLoading(false);
       setError(backendOfflineText);
+      showErrorToast(backendOfflineText, { toastId: 'admin-backend-offline' });
     }
     return ok;
   }, [backendOfflineText, backendOnline]);
@@ -399,7 +423,9 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     } catch (err) {
       if (stopForAuthError(err)) return;
       if (isBackendOfflineError(err)) setBackendOnline(false);
-      setError(err.message || `Unable to load ${entityConfigs[entity].label}.`);
+      const message = err.message || `Unable to load ${entityConfigs[entity].label}.`;
+      setError(message);
+      showApiErrorToast(err, { fallback: message });
     } finally {
       setLoading(false);
     }
@@ -433,7 +459,9 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
       const orderNumber = event?.detail?.order_id || event?.detail?.order_number || '';
       setActiveEntity('orders');
       setQuery('');
-      setNotice(orderNumber ? `Order ${orderNumber} was created. Reloading Manage Order List...` : 'Order was created. Reloading Manage Order List...');
+      const message = orderNumber ? `Order ${orderNumber} was created. Reloading Manage Order List...` : 'Order was created. Reloading Manage Order List...';
+      setNotice(message);
+      showInfoToast(message, { toastId: orderNumber ? `order-created-${orderNumber}` : 'order-created' });
       loadEntity('orders', '');
       loadSummary();
     };
@@ -452,6 +480,7 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
       if (!ok) {
         setLoading(false);
         setError(backendOfflineText);
+        showErrorToast(backendOfflineText, { toastId: 'admin-backend-offline' });
       }
     };
 
@@ -536,35 +565,48 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
         discount: Number(form.discount || 0),
         shipping_fee: Number(form.shipping_fee || 0),
         tax: Number(form.tax || 0),
-        items: items.map((item) => ({
+        items: validateOrderItems(items.map((item) => ({
           product_id: Number(item.product_id),
           product_name: safeString(item.product_name || item.name).trim(),
           quantity: Number(item.quantity),
           unit_price: Number(item.unit_price),
-        })),
+        }))),
       });
       validateRequiredFields(payload, [['customer_name', 'Customer name'], ['delivery_address', 'Delivery address']]);
+      if (!statusOptions.orders.includes(payload.status)) {
+        throw makeValidationError([`Invalid order status. Allowed values: ${statusOptions.orders.join(', ')}.`]);
+      }
       return payload;
     }
 
     if (activeEntity === 'reports') {
-      return cleanPayload({
-        name: form.name,
-        report_type: form.report_type,
-        status: form.status,
-        parameters: form.parameters_json.trim() ? JSON.parse(form.parameters_json) : {},
-        file_path: form.file_path,
+      let parameters = {};
+      try {
+        parameters = form.parameters_json.trim() ? JSON.parse(form.parameters_json) : {};
+      } catch {
+        throw makeValidationError(['Parameters JSON is invalid. Use a valid JSON object.']);
+      }
+      const payload = cleanPayload({
+        name: safeString(form.name).trim(),
+        report_type: safeString(form.report_type).trim(),
+        status: safeString(form.status).trim().toUpperCase() || 'QUEUED',
+        parameters,
+        file_path: safeString(form.file_path).trim(),
       });
+      validateRequiredFields(payload, [['name', 'Report name'], ['report_type', 'Report type']]);
+      return payload;
     }
 
     if (activeEntity === 'planning-requests') {
-      return cleanPayload({
-        title: form.title,
-        description: form.description,
-        priority: form.priority,
-        status: form.status,
+      const payload = cleanPayload({
+        title: safeString(form.title).trim(),
+        description: safeString(form.description).trim(),
+        priority: safeString(form.priority).trim() || 'normal',
+        status: safeString(form.status).trim().toUpperCase() || 'SUBMITTED',
         due_date: form.due_date ? new Date(form.due_date).toISOString() : undefined,
       });
+      validateRequiredFields(payload, [['title', 'Title']]);
+      return payload;
     }
 
     if (activeEntity === 'users') {
@@ -579,6 +621,8 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
       });
       if (editingRecord && !form.password) delete payload.password;
       validateRequiredFields(payload, editingRecord ? [['username', 'Username']] : [['username', 'Username'], ['password', 'Password']]);
+      payload.username = requireEmail(payload.username, 'Username/email');
+      if (payload.email) payload.email = requireEmail(payload.email, 'Email');
       return payload;
     }
 
@@ -607,6 +651,19 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
       return payload;
     }
 
+    if (activeEntity === 'audit-logs') {
+      const payload = cleanPayload({
+        action: safeString(form.action).trim().toUpperCase() || 'CREATE',
+        entity_type: safeString(form.entity_type).trim(),
+        entity_id: safeString(form.entity_id).trim(),
+        detail: safeString(form.detail).trim(),
+        ip_address: safeString(form.ip_address).trim(),
+        user_agent: safeString(form.user_agent).trim(),
+      });
+      validateRequiredFields(payload, [['action', 'Action'], ['entity_type', 'Entity type']]);
+      return payload;
+    }
+
     return cleanPayload(form);
   };
 
@@ -618,20 +675,43 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setNotice('');
     try {
       const payload = buildPayload();
+      let successMessage = '';
+      let orderUpdateDetail = null;
+
       if (editingRecord) {
-        await updateEntity(activeEntity, editingRecord.id, payload);
-        setNotice(`${config.label.slice(0, -1) || config.label} updated successfully.`);
+        const updatedRecord = await updateEntity(activeEntity, editingRecord.id, payload);
+        if (activeEntity === 'orders') {
+          const orderNumber = updatedRecord?.order_number || editingRecord.order_number || `#${editingRecord.id}`;
+          const orderStatus = updatedRecord?.status || payload.status || editingRecord.status || 'UPDATED';
+          successMessage = `Order ${orderNumber} was updated to ${humanize(String(orderStatus))}. Edit notification created.`;
+          orderUpdateDetail = { order: updatedRecord || editingRecord, message: successMessage };
+        } else {
+          successMessage = `${config.label.slice(0, -1) || config.label} updated successfully.`;
+        }
       } else {
         await createEntity(activeEntity, payload);
-        setNotice(`${config.label.slice(0, -1) || config.label} created successfully.`);
+        successMessage = `${config.label.slice(0, -1) || config.label} created successfully.`;
       }
+
       resetForm(activeEntity);
+      if (editingRecord) {
+        showEditNotification(successMessage);
+        if (orderUpdateDetail) {
+          window.dispatchEvent(new CustomEvent('finmark:order-updated', { detail: { ...orderUpdateDetail, options: { toastId: 'order-edit-notification' } } }));
+        }
+      } else {
+        setNotice(successMessage);
+        showSuccessToast(successMessage);
+      }
       await loadEntity(activeEntity, query);
       await loadLookups();
       await loadSummary();
     } catch (err) {
       if (stopForAuthError(err)) return;
-      setError(err.message || 'Unable to save record. Check required fields and try again.');
+      const message = err.message || 'Unable to save record. Check required fields and try again.';
+      setError(message);
+      if (err?.name === 'ValidationError' || err?.isValidationError) showValidationToast(message);
+      else showApiErrorToast(err, { fallback: message });
     } finally {
       setSaving(false);
     }
@@ -641,6 +721,7 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setEditingRecord(record);
     setNotice('');
     setError('');
+    focusEditWindow();
     if (activeEntity === 'users') {
       setForm({
         username: record.username || '',
@@ -723,13 +804,17 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setNotice('');
     try {
       await deleteEntity(activeEntity, record.id);
-      setNotice('Record removed successfully.');
+      const message = 'Record removed successfully.';
+      setNotice(message);
+      showSuccessToast(message);
       await loadEntity(activeEntity, query);
       await loadLookups();
       await loadSummary();
     } catch (err) {
       if (stopForAuthError(err)) return;
-      setError(err.message || 'Unable to delete record.');
+      const message = err.message || 'Unable to delete record.';
+      setError(message);
+      showApiErrorToast(err, { fallback: message });
     }
   };
 
@@ -885,6 +970,7 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
               setBackendOnline(ok);
               if (!ok) {
                 setError(backendOfflineText);
+                showErrorToast(backendOfflineText, { toastId: 'admin-backend-offline' });
                 return;
               }
               authStoppedRef.current = false;
@@ -927,8 +1013,8 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
           <section className="backend-offline-banner glass-card">
             <div>
               <strong>Backend API is offline</strong>
-              <p>The Admin Dashboard needs FastAPI running on <code>http://127.0.0.1:8000</code>. Start the backend, then click Check again.</p>
-              <code>python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000</code>
+              <p>The Admin Dashboard needs the local microservice gateway running. Start the enterprise microservices, then click Check again.</p>
+              <code>.\start-microservices-local-mysql.ps1</code>
             </div>
             <button className="primary-btn" type="button" onClick={async () => {
               const ok = await checkBackendHealth();
@@ -940,13 +1026,18 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
                 await loadSummary();
               } else {
                 setError(backendOfflineText);
+                showErrorToast(backendOfflineText, { toastId: 'admin-backend-offline' });
               }
             }}>Check again</button>
           </section>
         )}
 
         <section className="admin-workspace">
-          <article className="admin-panel glass-card">
+          <article
+            className={`admin-panel glass-card ${editingRecord ? 'is-editing' : ''}`}
+            ref={editPanelRef}
+            tabIndex={-1}
+          >
             <div className="admin-panel-head">
               <div>
                 <h2>{editingRecord ? `Edit ${config.label}` : `Create ${config.label}`}</h2>

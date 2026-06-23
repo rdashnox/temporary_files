@@ -25,6 +25,7 @@ def main() -> None:
     channel.exchange_declare(exchange="finmark.events", exchange_type="topic", durable=True)
     channel.queue_declare(queue="notification-service.events", durable=True)
     channel.queue_bind(exchange="finmark.events", queue="notification-service.events", routing_key="order.created")
+    channel.queue_bind(exchange="finmark.events", queue="notification-service.events", routing_key="order.updated")
     channel.queue_bind(exchange="finmark.events", queue="notification-service.events", routing_key="inventory.low_stock")
 
     def handle_message(ch, method, properties, body):

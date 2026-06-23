@@ -173,4 +173,19 @@ $editPayload = @{
 $updated = Invoke-FinMarkJson -Method Put -Uri "$apiBase/orders/$($matched.id)" -Headers $headers -ContentType "application/json" -Body $editPayload
 if ($updated.status -ne "SHIPPED") { throw "Order update did not persist. Expected SHIPPED but got $($updated.status)." }
 Write-Host "PASS: Admin Order Edit successfully updated order $($updated.order_number) to status $($updated.status)." -ForegroundColor Green
-Write-Host "Open Admin Dashboard > Orders > Refresh. Edit should now work in the browser too." -ForegroundColor Green
+
+try {
+    $notifications = Resolve-FinMarkListResponse -Value (Invoke-FinMarkJson -Method Get -Uri "$apiBase/notifications?limit=20" -Headers $headers)
+    $editNotice = $notifications | Where-Object {
+        ($_.title -match "Order updated") -and ($_.entity_id -eq $updated.order_number -or $_.message -match $updated.order_number)
+    } | Select-Object -First 1
+    if ($editNotice) {
+        Write-Host "PASS: Order edit notification is available: $($editNotice.title) - $($editNotice.message)" -ForegroundColor Green
+    } else {
+        Write-Host "NOTICE: The order update passed. No persisted notification was found yet. Restart microservices so NOTIFICATION_SERVICE_URL is applied, or run the RabbitMQ notification worker in Docker/cloud mode." -ForegroundColor Yellow
+    }
+} catch {
+    Write-Host "NOTICE: The order update passed. Notification check could not complete: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
+Write-Host "Open Admin Dashboard > Orders > Refresh. Edit should now focus the edit panel and show an edit notification." -ForegroundColor Green

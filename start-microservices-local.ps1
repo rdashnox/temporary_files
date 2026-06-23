@@ -148,6 +148,7 @@ if ($UseMySQL) {
     $env:EVENT_BUS_ENABLED = "false"
     $env:OTEL_ENABLED = "false"
     $env:INVENTORY_SERVICE_URL = $gatewayUrl
+    $env:NOTIFICATION_SERVICE_URL = $gatewayUrl
     $env:SERVICE_POOLS_JSON = $servicePoolsJson
 
     Write-Host "Checking MySQL database readiness before starting replicas..." -ForegroundColor Cyan
@@ -171,6 +172,7 @@ else {
     $env:EVENT_BUS_ENABLED = "false"
     $env:OTEL_ENABLED = "false"
     $env:INVENTORY_SERVICE_URL = $gatewayUrl
+    $env:NOTIFICATION_SERVICE_URL = $gatewayUrl
     $env:SERVICE_POOLS_JSON = $servicePoolsJson
     if (-not $env:AUTH_DATABASE_URL) { $env:AUTH_DATABASE_URL = "sqlite:///$($dataDir.Replace('\','/'))/auth.db" }
     if (-not $env:ORDER_DATABASE_URL) { $env:ORDER_DATABASE_URL = "sqlite:///$($dataDir.Replace('\','/'))/order.db" }

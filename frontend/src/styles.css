@@ -1678,3 +1678,61 @@ button.is-loading .button-spinner { display: inline-block; }
     flex-direction: column;
   }
 }
+
+/* Refactor: focus the edit form after clicking Edit and show edit notifications. */
+.admin-panel.is-editing {
+  outline: 3px solid rgba(37, 99, 235, 0.24);
+  box-shadow: 0 18px 48px rgba(37, 99, 235, 0.16);
+}
+
+.admin-panel:focus {
+  outline: 3px solid rgba(37, 99, 235, 0.32);
+  outline-offset: 3px;
+}
+
+.admin-edit-toast {
+  position: sticky;
+  top: 12px;
+  z-index: 20;
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border-radius: 18px;
+  border: 1px solid #bfdbfe;
+  background: rgba(239, 246, 255, 0.96);
+  box-shadow: 0 14px 38px rgba(37, 99, 235, 0.16);
+  color: #1e3a8a;
+}
+
+.admin-edit-toast strong {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-edit-toast span {
+  color: #1f2937;
+  font-weight: 750;
+}
+
+/* Enterprise Toast integration */
+.Toastify__toast-container--top-center {
+  top: 1.25rem;
+  width: min(560px, calc(100vw - 2rem));
+}
+
+.Toastify__toast {
+  border-radius: 18px;
+  font-family: inherit;
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.22);
+}
+
+.Toastify__toast-body {
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.Toastify__progress-bar {
+  opacity: 0.85;
+}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { registerUser, requestPasswordReset } from '../api/client.js';
+import { showApiErrorToast, showErrorToast, showSuccessToast, showValidationToast } from '../utils/toast.js';
 
 const INITIAL_LOGIN = {
   username: '',
@@ -87,8 +88,13 @@ export default function LoginPage({ onLogin }) {
     [registerForm.password],
   );
 
-  const setMessage = (key, text, type = 'error') => {
+  const setMessage = (key, text, type = 'error', { silent = false } = {}) => {
     setMessages((current) => ({ ...current, [key]: { text, type } }));
+    if (!silent && text) {
+      if (type === 'success') showSuccessToast(text);
+      else if (type === 'warning') showValidationToast(text);
+      else showErrorToast(text);
+    }
   };
 
   const clearMessage = (key) => {
@@ -173,8 +179,10 @@ export default function LoginPage({ onLogin }) {
 
     try {
       await onLogin({ username, password });
+      showSuccessToast('Login successful. Welcome back.');
     } catch (err) {
-      setMessage('login', `Login failed: ${err.message || 'Invalid credentials.'}`);
+      setMessage('login', `Login failed: ${err.message || 'Invalid credentials.'}`, 'error', { silent: true });
+      showApiErrorToast(err, { fallback: 'Login failed. Please check your credentials.' });
     } finally {
       setLoading((current) => ({ ...current, login: false }));
     }
@@ -209,7 +217,8 @@ export default function LoginPage({ onLogin }) {
       setVerificationLink(nextVerificationLink);
       setMessage('register', 'Account created. Please verify your email before logging in.', 'success');
     } catch (err) {
-      setMessage('register', `Registration failed: ${err.message || 'Unable to create account.'}`);
+      setMessage('register', `Registration failed: ${err.message || 'Unable to create account.'}`, 'error', { silent: true });
+      showApiErrorToast(err, { fallback: 'Registration failed. Please check the form.' });
     } finally {
       setLoading((current) => ({ ...current, register: false }));
     }
@@ -231,7 +240,8 @@ export default function LoginPage({ onLogin }) {
       setMessage('forgot', data.message || 'If the account exists, a password reset link has been generated.', 'success');
       if (data.reset_link) setResetLink(data.reset_link);
     } catch (err) {
-      setMessage('forgot', `Request failed: ${err.message || 'Unable to generate reset link.'}`);
+      setMessage('forgot', `Request failed: ${err.message || 'Unable to generate reset link.'}`, 'error', { silent: true });
+      showApiErrorToast(err, { fallback: 'Unable to generate reset link.' });
     } finally {
       setLoading((current) => ({ ...current, forgot: false }));
     }

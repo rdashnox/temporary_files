@@ -73,6 +73,21 @@ def process_integration_event(db: Session, event_message: dict) -> dict:
             entity_type="orders",
             entity_id=str(payload.get("order_number")),
         )
+    elif event_type == "order.updated":
+        changed_fields = payload.get("changed_fields") or []
+        changed_label = ", ".join(changed_fields) if changed_fields else "order details"
+        create_notification(
+            db,
+            user_id=payload.get("actor_user_id") or payload.get("user_id"),
+            title="Order updated",
+            message=(
+                f"Order {payload.get('order_number')} was updated to {payload.get('status')} "
+                f"by {payload.get('actor_username') or 'an administrator'} ({changed_label})."
+            ),
+            channel="in_app",
+            entity_type="orders",
+            entity_id=str(payload.get("order_number")),
+        )
     elif event_type == "inventory.low_stock":
         create_notification(
             db,

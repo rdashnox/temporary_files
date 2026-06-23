@@ -214,6 +214,50 @@ def _build_checkout_items(checkout_request: CheckoutRequest) -> list[CheckoutIte
     return items
 
 
+def _send_event_to_notification_service(message: dict) -> bool:
+    """Local/no-Docker fallback for immediate in-app edit notifications.
+
+    In production, RabbitMQ/notification_consumer processes the outbox event. In
+    local demos, RabbitMQ is usually disabled, so this optional direct internal
+    call lets the Notification service create the in-app notification right
+    after an order edit. The Notification service still uses inbox idempotency,
+    so processing the same event later through RabbitMQ will not duplicate it.
+    """
+    notification_url = os.getenv("NOTIFICATION_SERVICE_URL", "").rstrip("/")
+    if not notification_url:
+        return False
+    token = create_service_token("order-service", audience="finmark-internal")
+    try:
+        response = httpx.post(
+            f"{notification_url}/api/v1/notifications/internal/events",
+            json=message,
+            headers={"X-Service-Token": token},
+            timeout=httpx.Timeout(5.0, connect=2.0),
+        )
+        return response.status_code in (200, 201)
+    except httpx.HTTPError:
+        return False
+
+
+def _add_outbox_event(db: Session, event: IntegrationEvent) -> None:
+    """Persist and optionally publish a durable order-domain event."""
+    message = event.to_message()
+    outbox = OrderOutboxEvent(
+        event_id=message["event_id"],
+        event_type=message["event_type"],
+        aggregate_type=message["aggregate_type"],
+        aggregate_id=message["aggregate_id"],
+        payload_json=json.dumps(message, default=str),
+        status=OutboxStatus.PENDING,
+    )
+    db.add(outbox)
+    published = event_publisher.publish(event)
+    direct_notified = _send_event_to_notification_service(message)
+    if published or direct_notified:
+        outbox.status = OutboxStatus.PUBLISHED
+        outbox.published_at = utc_now()
+
+
 def create_order_event(db: Session, order: OrderEntity, current_user: dict) -> None:
     payload = {
         "order_number": order.order_number,
@@ -223,21 +267,23 @@ def create_order_event(db: Session, order: OrderEntity, current_user: dict) -> N
         "total": money(order.total),
         "status": enum_to_api(order.status),
     }
-    event = IntegrationEvent("order.created", "order", order.order_number, payload)
-    message = event.to_message()
-    outbox = OrderOutboxEvent(
-        event_id=message["event_id"],
-        event_type="order.created",
-        aggregate_type="order",
-        aggregate_id=order.order_number,
-        payload_json=json.dumps(message, default=str),
-        status=OutboxStatus.PENDING,
-    )
-    db.add(outbox)
-    published = event_publisher.publish(event)
-    if published:
-        outbox.status = OutboxStatus.PUBLISHED
-        outbox.published_at = utc_now()
+    _add_outbox_event(db, IntegrationEvent("order.created", "order", order.order_number, payload))
+
+
+def create_order_updated_event(db: Session, order: OrderEntity, current_user: dict, changed_fields: list[str]) -> None:
+    payload = {
+        "order_number": order.order_number,
+        "order_id": order.id,
+        "user_id": order.user_id,
+        "actor_user_id": current_user.get("id"),
+        "actor_username": current_user.get("username"),
+        "customer_name": order.customer_name,
+        "total": money(order.total),
+        "status": enum_to_api(order.status),
+        "changed_fields": changed_fields,
+        "updated_at": iso(order.updated_at) or datetime.now(timezone.utc).isoformat(),
+    }
+    _add_outbox_event(db, IntegrationEvent("order.updated", "order", order.order_number, payload))
 
 
 def checkout(db: Session, checkout_request: CheckoutRequest, current_user: dict, idempotency_key: str | None = None) -> CheckoutResponse:
@@ -534,24 +580,36 @@ def create_order(db: Session, order_create: OrderCreate, current_user: dict) -> 
 
 def update_order(db: Session, order_id: int, order_update: OrderUpdate, current_user: dict) -> dict:
     order = _get_order_for_update(db, order_id)
+    changed_fields: list[str] = []
 
     try:
         for field in ["customer_name", "delivery_address", "payment_method", "discount", "shipping_fee", "tax"]:
             value = getattr(order_update, field)
-            if value is not None:
+            if value is not None and getattr(order, field) != value:
                 setattr(order, field, value)
+                changed_fields.append(field)
 
         if order_update.status is not None:
-            order.status = status_to_storage(enum_from_input(OrderStatus, order_update.status, order.status))
+            next_status = status_to_storage(enum_from_input(OrderStatus, order_update.status, order.status))
+            if status_to_storage(order.status) != next_status:
+                order.status = next_status
+                changed_fields.append("status")
 
         if order_update.items is not None:
             # Synchronize in place. This is safe for both unchanged item lists
             # and true item edits because existing products are updated instead
             # of deleted/reinserted.
-            _replace_items(db, order, order_update.items)
+            if not _submitted_items_match_existing(db, order_id, order_update.items):
+                _replace_items(db, order, order_update.items)
+                changed_fields.append("items")
+            else:
+                _sync_subtotal_from_existing_items(db, order)
         else:
             _recalculate_order_totals(order)
             db.flush()
+
+        if changed_fields:
+            create_order_updated_event(db, order, current_user, changed_fields)
 
         db.commit()
     except HTTPException:

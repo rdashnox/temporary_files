@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { verifyEmailToken } from '../api/client.js';
+import { showApiErrorToast, showSuccessToast, showValidationToast } from '../utils/toast.js';
 
 export default function VerifyEmailPage({ onBackToLogin }) {
   const token = useMemo(() => new URLSearchParams(window.location.search).get('token'), []);
@@ -10,16 +11,22 @@ export default function VerifyEmailPage({ onBackToLogin }) {
 
     const verify = async () => {
       if (!token) {
-        setMessage({ text: 'Verification token is missing.', type: 'error' });
+        const text = 'Verification token is missing.';
+        setMessage({ text, type: 'error' });
+        showValidationToast(text);
         return;
       }
 
       try {
         const data = await verifyEmailToken(token);
-        setMessage({ text: `${data.message} Redirecting to login...`, type: 'success' });
+        const text = `${data.message} Redirecting to login...`;
+        setMessage({ text, type: 'success' });
+        showSuccessToast(text);
         timeoutId = window.setTimeout(onBackToLogin, 1500);
       } catch (err) {
-        setMessage({ text: err.message || 'Email verification failed.', type: 'error' });
+        const text = err.message || 'Email verification failed.';
+        setMessage({ text, type: 'error' });
+        showApiErrorToast(err, { fallback: text });
       }
     };
 

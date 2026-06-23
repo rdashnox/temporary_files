@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .core.config import settings
 from .database import engine, init_db, safe_database_url, session_scope
 from .services.seed_service import seed_database
+from .validation import install_validation_exception_handlers
 
 RouterSpec = tuple[APIRouter, str, Sequence[str]]
 
@@ -48,6 +49,7 @@ def create_service_app(
                 "Start the gateway and service replicas instead of backend.main:app."
             ),
         )
+        install_validation_exception_handlers(app, service_slug=service_slug)
 
         app.add_middleware(
             CORSMiddleware,
@@ -123,6 +125,7 @@ def create_service_app(
         version=version,
         lifespan=lifespan,
     )
+    install_validation_exception_handlers(app, service_slug=service_slug)
 
     app.add_middleware(GZipMiddleware, minimum_size=settings.gzip_minimum_size)
 

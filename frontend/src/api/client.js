@@ -1,3 +1,5 @@
+import { requireEmail, requireText, validateOrderItems, validationError } from '../utils/validation.js';
+import { showErrorToast } from '../utils/toast.js';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 const REQUEST_TIMEOUT_MS = Number(import.meta.env.VITE_REQUEST_TIMEOUT_MS || 15000);
 const PRODUCT_CACHE_TTL_MS = Number(import.meta.env.VITE_PRODUCT_CACHE_TTL_MS || 60000);
@@ -35,6 +37,7 @@ export const isAuthRequiredError = (error) => Boolean(error?.isAuthRequired);
 const notifyAuthExpired = () => {
   if (authExpiredAlreadyNotified) return;
   authExpiredAlreadyNotified = true;
+  showErrorToast('Your session expired. Please log in again.', { toastId: 'finmark-auth-expired' });
   window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
 };
 
@@ -80,24 +83,35 @@ const safeFetch = async (url, options = {}) => {
   }
 };
 
-const formatApiDetail = (detail) => {
+const formatApiDetail = (detail, fallbackMessage = '') => {
   if (Array.isArray(detail)) {
     return detail
       .map((item) => {
         const location = Array.isArray(item.loc) ? item.loc.filter((part) => part !== 'body').join('.') : '';
-        return `${location ? `${location}: ` : ''}${item.msg || 'Invalid value'}`;
+        return `${location ? `${location}: ` : ''}${item.msg || item.message || 'Invalid value'}`;
       })
       .join(' ');
   }
-  if (typeof detail === 'object' && detail !== null) return JSON.stringify(detail);
-  return detail;
+  if (typeof detail === 'object' && detail !== null) {
+    if (typeof detail.message === 'string') return detail.message;
+    if (Array.isArray(detail.fields)) {
+      return detail.fields.map((field) => `${field.field}: ${field.message}`).join(' ');
+    }
+    return JSON.stringify(detail);
+  }
+  return detail || fallbackMessage;
 };
 
 const parseResponse = async (response) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const message = formatApiDetail(data.detail) || data.message || 'Request failed. Please try again.';
-    throw new Error(message);
+    const message = data.message || formatApiDetail(data.detail, data.error) || 'Request failed. Please try again.';
+    const error = new Error(message);
+    error.status = response.status;
+    error.apiError = data;
+    if (response.status === 400 || response.status === 422) error.isValidationError = true;
+    if (response.status === 401) error.isAuthRequired = true;
+    throw error;
   }
   return data;
 };
@@ -121,9 +135,11 @@ export const checkBackendHealth = async () => {
 };
 
 export const login = async ({ username, password }) => {
+  const cleanUsername = requireEmail(username, 'Email');
+  const cleanPassword = requireText(password, 'Password');
   const form = new URLSearchParams();
-  form.set('username', username);
-  form.set('password', password);
+  form.set('username', cleanUsername);
+  form.set('password', cleanPassword);
 
   const response = await safeFetch(`${API_BASE_URL}/auth/token`, {
     method: 'POST',
@@ -137,20 +153,25 @@ export const login = async ({ username, password }) => {
 };
 
 export const registerUser = async ({ username, password, confirm_password }) => {
+  const cleanUsername = requireEmail(username, 'Email');
+  const cleanPassword = requireText(password, 'Password', { minLength: 8 });
+  const cleanConfirmPassword = requireText(confirm_password, 'Confirm password', { minLength: 8 });
+  if (cleanPassword !== cleanConfirmPassword) throw validationError('Passwords do not match.');
   const response = await safeFetch(`${API_BASE_URL}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password, confirm_password }),
+    body: JSON.stringify({ username: cleanUsername, password: cleanPassword, confirm_password: cleanConfirmPassword }),
   });
 
   return parseResponse(response);
 };
 
 export const requestPasswordReset = async ({ username }) => {
+  const cleanUsername = requireEmail(username, 'Email');
   const response = await safeFetch(`${API_BASE_URL}/auth/forgot-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify({ username: cleanUsername }),
   });
 
   return parseResponse(response);
@@ -162,10 +183,14 @@ export const verifyEmailToken = async (token) => {
 };
 
 export const resetPassword = async ({ token, new_password, confirm_password }) => {
+  const cleanToken = requireText(token, 'Password reset token', { minLength: 20 });
+  const cleanPassword = requireText(new_password, 'New password', { minLength: 8 });
+  const cleanConfirmPassword = requireText(confirm_password, 'Confirm password', { minLength: 8 });
+  if (cleanPassword !== cleanConfirmPassword) throw validationError('Passwords do not match.');
   const response = await safeFetch(`${API_BASE_URL}/auth/reset-password`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ token, new_password, confirm_password }),
+    body: JSON.stringify({ token: cleanToken, new_password: cleanPassword, confirm_password: cleanConfirmPassword }),
   });
 
   return parseResponse(response);
@@ -285,11 +310,21 @@ const rememberCreatedOrder = (order) => {
 };
 
 export const checkoutCart = async (payload) => {
+  const cleanPayload = {
+    ...payload,
+    customer_name: requireText(payload?.customer_name, 'Customer name', { minLength: 2, maxLength: 80 }),
+    delivery_address: requireText(payload?.delivery_address, 'Delivery address', { minLength: 5, maxLength: 180 }),
+    payment_method: requireText(payload?.payment_method || 'Cash on Delivery', 'Payment method'),
+    items: Array.isArray(payload?.items)
+      ? payload.items.map((item) => ({ product_id: Number(item.product_id), quantity: Number(item.quantity) }))
+      : [],
+  };
+  if (!cleanPayload.items.length) throw validationError('Please add at least one product before checkout.');
   const idempotencyKey = payload.idempotency_key || createClientRequestId('checkout');
   const response = await authFetch('/orders/checkout', {
     method: 'POST',
     headers: { 'Idempotency-Key': idempotencyKey, 'Cache-Control': 'no-cache' },
-    body: JSON.stringify({ ...payload, idempotency_key: idempotencyKey }),
+    body: JSON.stringify({ ...cleanPayload, idempotency_key: idempotencyKey }),
   });
   const result = await parseResponse(response);
   rememberCreatedOrder(result);
@@ -417,13 +452,15 @@ export const updateEntity = async (entity, id, payload) => {
   // when the local gateway, Nginx gateway, or a browser cache still points to
   // one of the older /database/orders paths.
   if (entity === 'orders') {
+    const cleanPayload = { ...payload };
+    if (Array.isArray(cleanPayload.items)) cleanPayload.items = validateOrderItems(cleanPayload.items);
     const endpoints = [`/orders/${id}`, `/database/orders/${id}`];
     let lastError = null;
     for (const endpoint of endpoints) {
       try {
         const response = await authFetch(endpoint, {
           method: 'PUT',
-          body: JSON.stringify(payload),
+          body: JSON.stringify(cleanPayload),
         });
         return await parseResponse(response);
       } catch (error) {

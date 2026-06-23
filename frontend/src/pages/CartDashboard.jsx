@@ -4,6 +4,7 @@ import CartPanel from '../components/CartPanel.jsx';
 import ProductCard from '../components/ProductCard.jsx';
 import StatCard from '../components/StatCard.jsx';
 import { getDisplayName, getRoleNames, normalizeUser } from '../utils/access.js';
+import { showApiErrorToast, showInfoToast, showWarningToast } from '../utils/toast.js';
 
 const currency = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -50,7 +51,9 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
         const data = await getProducts();
         setProducts(data);
       } catch (err) {
-        setError(err.message || 'Unable to load products.');
+        const message = err.message || 'Unable to load products.';
+        setError(message);
+        showApiErrorToast(err, { fallback: message });
       } finally {
         setLoading(false);
       }
@@ -110,7 +113,11 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
   const addToCart = (product) => {
     setCart((current) => {
       const currentQty = current[product.id] || 0;
-      if (currentQty >= product.stock) return current;
+      if (currentQty >= product.stock) {
+        showWarningToast(`${product.name} has no more available stock for this cart.`, { toastId: `stock-${product.id}` });
+        return current;
+      }
+      showInfoToast(`${product.name} added to cart.`, { toastId: `cart-add-${product.id}-${currentQty + 1}`, autoClose: 1800 });
       return { ...current, [product.id]: currentQty + 1 };
     });
   };
@@ -136,7 +143,7 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
       customer_name: customerName,
       delivery_address: deliveryAddress,
       payment_method: paymentMethod,
-      coupon_code: couponCode,
+      coupon_code: couponCode?.trim() || undefined,
       items: cartItems.map((item) => ({ product_id: item.id, quantity: item.quantity })),
     };
 

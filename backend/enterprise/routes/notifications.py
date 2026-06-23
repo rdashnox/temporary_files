@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, status
+
+from ...schemas.notification import IntegrationEventRequest
 from sqlalchemy.orm import Session
 
 from ..databases import get_notification_db
@@ -33,5 +35,9 @@ def mark_all_read(current_user: dict = Depends(get_current_user), db: Session = 
 
 
 @router.post("/internal/events")
-def internal_process_event(event_message: dict, service: dict = Depends(require_service_token), db: Session = Depends(get_notification_db)):
-    return notification_service.process_integration_event(db, event_message)
+def internal_process_event(
+    event_message: IntegrationEventRequest,
+    service: dict = Depends(require_service_token),
+    db: Session = Depends(get_notification_db),
+):
+    return notification_service.process_integration_event(db, event_message.model_dump())

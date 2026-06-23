@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from .config import enterprise_settings
 from .databases import get_engine_for_service, safe_url, service_database_urls
 from .observability.tracing import configure_tracing
+from ..validation import install_validation_exception_handlers
 
 RouterSpec = tuple[APIRouter, str, Sequence[str]]
 
@@ -33,6 +34,7 @@ def create_enterprise_service_app(
         yield
 
     app = FastAPI(title=f"FinMark {service_name} Enterprise Service API", version=version, lifespan=lifespan)
+    install_validation_exception_handlers(app, service_slug=service_slug)
     app.add_middleware(GZipMiddleware, minimum_size=enterprise_settings.gzip_minimum_size)
     app.add_middleware(
         CORSMiddleware,

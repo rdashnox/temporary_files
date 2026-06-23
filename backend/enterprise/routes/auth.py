@@ -14,8 +14,15 @@ router = APIRouter()
 
 @router.post("/token")
 def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_auth_db)):
+    username = (form_data.username or "").strip()
+    password = form_data.password or ""
+    if not username or not password.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email/username and password are required.",
+        )
     try:
-        token_pair = auth_service.authenticate_user(db, form_data.username, form_data.password)
+        token_pair = auth_service.authenticate_user(db, username, password)
     except PermissionError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     if not token_pair:

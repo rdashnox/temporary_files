@@ -941,3 +941,33 @@ Run:
 ```
 
 See `ORDER_EDIT_FINAL_TRANSACTION_FIX.md` for details.
+
+## Order Edit Focus + Notification Update
+
+This build includes the final order-edit workflow improvement:
+
+- Clicking **Edit** in Admin Dashboard → Orders now scrolls to and focuses the edit form.
+- Saving an edited order shows a sticky edit notification in the Admin Dashboard.
+- The Order Service emits an `order.updated` event.
+- The Notification Service can create an in-app notification from that edit event.
+
+Run this verifier after starting the services:
+
+```powershell
+.\verify-admin-order-edit.ps1
+```
+
+See `ORDER_EDIT_FOCUS_NOTIFICATION_REFACTOR.md` for details.
+
+## Enterprise Validation and Missing-Input Handling
+
+This build includes enterprise-grade validation for frontend forms and backend API endpoints. Missing/null/invalid values now return controlled 400/422-style responses with clear messages instead of causing application crashes.
+
+Run the validation test after starting the local microservices:
+
+```powershell
+.\start-microservices-local-mysql.ps1
+.\verify-invalid-input-handling.ps1
+```
+
+See `VALIDATION_ERROR_HANDLING_REPORT.md` for the full validation scope.

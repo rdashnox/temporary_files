@@ -4,6 +4,7 @@ import DashboardRouter from './pages/DashboardRouter.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx';
 import VerifyEmailPage from './pages/VerifyEmailPage.jsx';
+import { showErrorToast, showInfoToast, showSuccessToast, showWarningToast } from './utils/toast.js';
 
 const getAuthRoute = () => {
   const path = window.location.pathname.toLowerCase();
@@ -27,6 +28,32 @@ export default function App() {
     setSession((current) => (current.status === 'authenticated' ? current : { status: 'guest', user: null }));
   }, []);
 
+
+
+  useEffect(() => {
+    const handleToastEvent = (event) => {
+      const detail = event?.detail || {};
+      const message = detail.message || detail.text;
+      if (!message) return;
+      const options = detail.options || {};
+      if (detail.type === 'success') showSuccessToast(message, options);
+      else if (detail.type === 'warning') showWarningToast(message, options);
+      else if (detail.type === 'error') showErrorToast(message, options);
+      else showInfoToast(message, options);
+    };
+
+    const handleOrderUpdated = (event) => {
+      const message = event?.detail?.message;
+      if (message) showSuccessToast(message, { toastId: event?.detail?.options?.toastId || 'global-order-updated' });
+    };
+
+    window.addEventListener('finmark:toast', handleToastEvent);
+    window.addEventListener('finmark:order-updated', handleOrderUpdated);
+    return () => {
+      window.removeEventListener('finmark:toast', handleToastEvent);
+      window.removeEventListener('finmark:order-updated', handleOrderUpdated);
+    };
+  }, []);
 
   useEffect(() => {
     const handleAuthExpired = () => {

@@ -13,6 +13,7 @@ x-backend-env: &backend-env
   INVENTORY_DATABASE_URL: mysql+pymysql://finmark_inventory:finmark_inventory_password@inventory-mysql:3306/finmark_inventory_db
   NOTIFICATION_DATABASE_URL: mysql+pymysql://finmark_notification:finmark_notification_password@notification-mysql:3306/finmark_notification_db
   INVENTORY_SERVICE_URL: http://microservice-gateway
+  NOTIFICATION_SERVICE_URL: http://microservice-gateway
   RABBITMQ_URL: amqp://finmark:finmark_rabbit_password@rabbitmq:5672/%2F
   EVENT_BUS_ENABLED: 'true'
   OTEL_ENABLED: 'true'

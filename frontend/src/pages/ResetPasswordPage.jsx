@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { resetPassword } from '../api/client.js';
+import { showApiErrorToast, showSuccessToast, showValidationToast } from '../utils/toast.js';
 
 const getPasswordStrengthStatus = (password) => ({
   length: password.length >= 8,
@@ -51,18 +52,24 @@ export default function ResetPasswordPage({ onBackToLogin }) {
     setMessage({ text: '', type: '' });
 
     if (!token) {
-      setMessage({ text: 'Password reset token is missing. Please request a new reset link.', type: 'error' });
+      const text = 'Password reset token is missing. Please request a new reset link.';
+      setMessage({ text, type: 'error' });
+      showValidationToast(text);
       return;
     }
 
     const passwordErrors = getPasswordStrengthErrors(form.new_password);
     if (passwordErrors.length > 0) {
-      setMessage({ text: `Password must include ${passwordErrors.join(', ')}.`, type: 'error' });
+      const text = `Password must include ${passwordErrors.join(', ')}.`;
+      setMessage({ text, type: 'error' });
+      showValidationToast(text);
       return;
     }
 
     if (form.new_password !== form.confirm_password) {
-      setMessage({ text: 'Passwords do not match.', type: 'error' });
+      const text = 'Passwords do not match.';
+      setMessage({ text, type: 'error' });
+      showValidationToast(text);
       return;
     }
 
@@ -74,10 +81,14 @@ export default function ResetPasswordPage({ onBackToLogin }) {
         new_password: form.new_password,
         confirm_password: form.confirm_password,
       });
-      setMessage({ text: `${data.message} Redirecting to login...`, type: 'success' });
+      const text = `${data.message} Redirecting to login...`;
+      setMessage({ text, type: 'success' });
+      showSuccessToast(text);
       window.setTimeout(onBackToLogin, 1500);
     } catch (err) {
-      setMessage({ text: err.message || 'Password reset failed.', type: 'error' });
+      const text = err.message || 'Password reset failed.';
+      setMessage({ text, type: 'error' });
+      showApiErrorToast(err, { fallback: text });
     } finally {
       setLoading(false);
     }

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.orm import Session
 
@@ -21,6 +21,18 @@ class ReserveStockItem(BaseModel):
 
 class ReserveStockRequest(BaseModel):
     items: list[ReserveStockItem] = Field(..., min_length=1)
+
+    @model_validator(mode="after")
+    def unique_product_ids(self):
+        seen: set[int] = set()
+        duplicates: set[int] = set()
+        for item in self.items:
+            if item.product_id in seen:
+                duplicates.add(item.product_id)
+            seen.add(item.product_id)
+        if duplicates:
+            raise ValueError(f"Duplicate product_id values are not allowed: {', '.join(map(str, sorted(duplicates)))}.")
+        return self
 
 
 @router.get("/products", response_model=list[Product])

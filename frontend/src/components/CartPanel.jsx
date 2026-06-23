@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import { requireText } from '../utils/validation.js';
+import { showApiErrorToast, showSuccessToast, showValidationToast } from '../utils/toast.js';
 
 const currency = new Intl.NumberFormat('en-PH', {
   style: 'currency',
@@ -34,16 +36,37 @@ export default function CartPanel({ cartItems, subtotal, onUpdateQuantity, onCle
     setError('');
 
     if (!cartItems.length) {
-      setError('Please add at least one product before checkout.');
+      const message = 'Please add at least one product before checkout.';
+      setError(message);
+      showValidationToast(message);
+      return;
+    }
+
+    let cleanedForm;
+    try {
+      cleanedForm = {
+        customerName: requireText(checkoutForm.customerName, 'Customer name', { minLength: 2, maxLength: 80 }),
+        deliveryAddress: requireText(checkoutForm.deliveryAddress, 'Delivery address', { minLength: 5, maxLength: 180 }),
+        paymentMethod: requireText(checkoutForm.paymentMethod, 'Payment method'),
+        couponCode: checkoutForm.couponCode.trim(),
+      };
+    } catch (err) {
+      const message = err.message || 'Please complete the checkout form.';
+      setError(message);
+      showValidationToast(message);
       return;
     }
 
     setLoading(true);
     try {
-      await onCheckout(checkoutForm);
+      const result = await onCheckout(cleanedForm);
+      const orderNumber = result?.order_id || result?.order_number || 'your order';
+      showSuccessToast(`Checkout successful. Order ${orderNumber} was created.`);
       setCheckoutForm((current) => ({ ...current, couponCode: '' }));
     } catch (err) {
-      setError(err.message || 'Checkout failed. Please try again.');
+      const message = err.message || 'Checkout failed. Please try again.';
+      setError(message);
+      showApiErrorToast(err, { fallback: message });
     } finally {
       setLoading(false);
     }

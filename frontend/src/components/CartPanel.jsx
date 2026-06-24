@@ -16,7 +16,6 @@ export default function CartPanel({ cartItems, subtotal, onUpdateQuantity, onCle
     couponCode: '',
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
 
   const estimatedDiscount = useMemo(() => {
     return checkoutForm.couponCode.trim().toUpperCase() === 'SAVE10' ? subtotal * 0.1 : 0;
@@ -33,11 +32,8 @@ export default function CartPanel({ cartItems, subtotal, onUpdateQuantity, onCle
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError('');
-
     if (!cartItems.length) {
       const message = 'Please add at least one product before checkout.';
-      setError(message);
       showValidationToast(message);
       return;
     }
@@ -52,7 +48,6 @@ export default function CartPanel({ cartItems, subtotal, onUpdateQuantity, onCle
       };
     } catch (err) {
       const message = err.message || 'Please complete the checkout form.';
-      setError(message);
       showValidationToast(message);
       return;
     }
@@ -65,7 +60,6 @@ export default function CartPanel({ cartItems, subtotal, onUpdateQuantity, onCle
       setCheckoutForm((current) => ({ ...current, couponCode: '' }));
     } catch (err) {
       const message = err.message || 'Checkout failed. Please try again.';
-      setError(message);
       showApiErrorToast(err, { fallback: message });
     } finally {
       setLoading(false);
@@ -137,7 +131,6 @@ export default function CartPanel({ cartItems, subtotal, onUpdateQuantity, onCle
           <input name="couponCode" value={checkoutForm.couponCode} onChange={handleChange} placeholder="Try SAVE10" />
         </label>
 
-        {error && <div className="alert error">{error}</div>}
 
         <button className="primary-btn full" type="submit" disabled={loading || !cartItems.length}>
           {loading ? 'Processing...' : 'Checkout now'}

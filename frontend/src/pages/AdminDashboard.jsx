@@ -321,7 +321,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [backendOnline, setBackendOnline] = useState(null);
   const authStoppedRef = useRef(false);
   const summaryLoadedRef = useRef(false);
@@ -355,7 +354,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setEditingRecord(null);
     setForm(createEmptyForm(entity));
     setError('');
-    setNotice('');
   }, [activeEntity]);
 
   const focusEditWindow = useCallback(() => {
@@ -372,7 +370,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
   }, []);
 
   const showEditNotification = useCallback((message) => {
-    setNotice(message);
     showSuccessToast(message, { toastId: 'order-edit-notification', autoClose: 6500 });
   }, []);
 
@@ -460,7 +457,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
       setActiveEntity('orders');
       setQuery('');
       const message = orderNumber ? `Order ${orderNumber} was created. Reloading Manage Order List...` : 'Order was created. Reloading Manage Order List...';
-      setNotice(message);
       showInfoToast(message, { toastId: orderNumber ? `order-created-${orderNumber}` : 'order-created' });
       loadEntity('orders', '');
       loadSummary();
@@ -538,7 +534,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     setEditingRecord(null);
     setForm(createEmptyForm(entity));
     setError('');
-    setNotice('');
     setActiveEntity(entity);
   };
 
@@ -672,7 +667,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     if (!canManage) return;
     setSaving(true);
     setError('');
-    setNotice('');
     try {
       const payload = buildPayload();
       let successMessage = '';
@@ -700,7 +694,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
           window.dispatchEvent(new CustomEvent('finmark:order-updated', { detail: { ...orderUpdateDetail, options: { toastId: 'order-edit-notification' } } }));
         }
       } else {
-        setNotice(successMessage);
         showSuccessToast(successMessage);
       }
       await loadEntity(activeEntity, query);
@@ -719,7 +712,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
 
   const handleEdit = (record) => {
     setEditingRecord(record);
-    setNotice('');
     setError('');
     focusEditWindow();
     if (activeEntity === 'users') {
@@ -801,11 +793,9 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
     const ok = window.confirm(`Delete/deactivate this ${config.label.toLowerCase()} record?`);
     if (!ok) return;
     setError('');
-    setNotice('');
     try {
       await deleteEntity(activeEntity, record.id);
       const message = 'Record removed successfully.';
-      setNotice(message);
       showSuccessToast(message);
       await loadEntity(activeEntity, query);
       await loadLookups();
@@ -1045,8 +1035,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
               </div>
             </div>
 
-            {error && <p className="message error">{error}</p>}
-            {notice && <p className="message success">{notice}</p>}
 
             <form className="admin-form" onSubmit={handleSubmit}>
               {formFields.map(renderField)}
@@ -1069,9 +1057,6 @@ export default function AdminDashboard({ user: rawUser, onLogout, onOpenProducts
               </form>
             </div>
 
-            {error && (
-              <div className="state-card error-text">{error}</div>
-            )}
 
             {activeEntity === 'roles' && !loading && !error && (
               <div className="roles-readiness-card">

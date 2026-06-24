@@ -6,12 +6,6 @@ import StatCard from '../components/StatCard.jsx';
 import { getDisplayName, getRoleNames, normalizeUser } from '../utils/access.js';
 import { showApiErrorToast, showInfoToast, showWarningToast } from '../utils/toast.js';
 
-const currency = new Intl.NumberFormat('en-PH', {
-  style: 'currency',
-  currency: 'PHP',
-  maximumFractionDigits: 0,
-});
-
 const baseNavSections = [
   { icon: '⌂', label: 'Dashboard', target: 'dashboard' },
   { icon: '▣', label: 'Inventory', target: 'inventory' },
@@ -40,19 +34,16 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('All');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [order, setOrder] = useState(null);
 
   useEffect(() => {
     const loadProducts = async () => {
       setLoading(true);
-      setError('');
       try {
         const data = await getProducts();
         setProducts(data);
       } catch (err) {
         const message = err.message || 'Unable to load products.';
-        setError(message);
         showApiErrorToast(err, { fallback: message });
       } finally {
         setLoading(false);
@@ -260,20 +251,6 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
               </article>
             </section>
 
-            {order && (
-              <section className="order-success glass-card">
-                <button aria-label="Close order confirmation" onClick={() => setOrder(null)}>×</button>
-                <p className="eyebrow">Order confirmed</p>
-                <h2>{order.order_id}</h2>
-                <p>{order.message}</p>
-                <strong>Total: {currency.format(order.summary.total)}</strong>
-                {canOpenAdmin && (
-                  <button className="light-btn small" type="button" onClick={() => onOpenAdmin('orders')}>
-                    View in Admin Order List
-                  </button>
-                )}
-              </section>
-            )}
 
             <section className="product-section" id="storefront">
               <div className="section-title-row">
@@ -298,9 +275,8 @@ export default function CartDashboard({ user: rawUser, onLogout, onOpenAdmin, ca
               </div>
 
               {loading && <div className="glass-card state-card">Loading protected products...</div>}
-              {error && <div className="glass-card state-card error-text">{error}</div>}
 
-              {!loading && !error && (
+              {!loading && (
                 <div className="product-grid">
                   {filteredProducts.map((product) => (
                     <ProductCard

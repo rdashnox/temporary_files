@@ -332,3 +332,23 @@ TOAST_INTEGRATION_REPORT.md
 ## Summary
 
 The project now has an enterprise-style Toast architecture. Validation errors, API errors, success messages, checkout messages, admin edit results, and system notification events are presented consistently using top-center Toasts while preserving inline messages for accessibility and context.
+
+---
+
+## Toast-Only Dashboard Cleanup
+
+A follow-up cleanup was applied to remove duplicate embedded success/error messages from the Product Dashboard and Admin Dashboard. Checkout, validation, order edit, create/update/delete, and API feedback now use centralized Toast messages only.
+
+Changed files:
+
+```text
+frontend/src/components/CartPanel.jsx
+frontend/src/pages/CartDashboard.jsx
+frontend/src/pages/AdminDashboard.jsx
+```
+
+Additional verification:
+
+```powershell
+.\verify-toast-only-dashboard.ps1
+```

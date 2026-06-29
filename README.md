@@ -308,305 +308,87 @@ Expected result:
 Database connection successful
 ```
 
-### 7. Run the Backend
+# FinMark Enterprise Microservices Terminal Commands
+
+This file contains the complete PowerShell command sequence for testing the FinMark enterprise microservice system.
+
+Use these commands from your project root:
 
 ```powershell
-python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+C:\Users\ca\Documents\CONRAD\MAPUA\MO-IT151 - Platform Technologies\PROJECT\PlatformTech-SD1-MS2
 ```
-
-Open:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-### 8. Install and Run the Frontend
-
-Open another terminal:
-
-```powershell
-cd frontend
-npm config set registry https://registry.npmjs.org/
-npm install
-npm run dev
-```
-
-Open:
-
-```text
-http://127.0.0.1:5173
-```
-
-### 9. Faster Windows Start Option
-
-From the project root:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\start-dev.ps1
-```
-
-This opens separate backend and frontend terminals.
-
-## Common Issues and Fixes
-
-### `ModuleNotFoundError: No module named 'backend'`
-
-You are not in the project root. Run backend commands from the folder that contains `backend`, `frontend`, and `requirements.txt`.
-
-```powershell
-cd "C:\Users\ca\Documents\CONRAD\MAPUA\MO-IT151 - Platform Technologies\PROJECT\PlatformTech-SD1-MS2"
-python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-### `.\.venv\Scripts\Activate.ps1 is not recognized`
-
-Create the virtual environment first:
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-```
-
-### PowerShell blocks activation
-
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-```
-
-### Frontend shows backend offline or proxy errors
-
-Make sure FastAPI is running:
-
-```text
-http://127.0.0.1:8000/docs
-```
-
-Then restart the frontend.
-
-### Backend terminal shows many `401 Unauthorized` logs
-
-Clear old browser tokens and login again:
-
-```text
-DevTools → Application → Local Storage → http://localhost:5173
-Delete access_token and refresh_token
-```
-
-### KPI cards show wrong totals
-
-Use the latest backend route:
-
-```text
-GET /api/v1/database/summary
-```
-
-Then restart both backend and frontend.
-
-### `POST /api/v1/database/permissions 422 Unprocessable Content`
-
-The permission form must send these fields:
-
-```text
-code
-name
-module
-```
-
-Example permission code:
-
-```text
-orders.export
-```
-
-The updated frontend can auto-derive:
-
-```text
-Name: Orders Export
-Module: orders
-```
-
-## Testing
-
-Run backend tests:
-
-```powershell
-pytest
-```
-
-Run frontend build:
-
-```powershell
-cd frontend
-npm run build
-```
-
-## Suggested Demo Flow for Presentation
-
-Show these in order:
-
-1. Login page.
-2. Admin login using `admin@example.com / Admin123!`.
-3. Admin Dashboard KPI cards showing real MySQL counts.
-4. Users tab showing user records and role assignment.
-5. Roles tab showing role cards and role permissions.
-6. Permissions tab creating a sample permission like `orders.export`.
-7. Orders tab showing order records.
-8. Reports tab showing report records.
-9. Audit Logs tab showing recorded system activity.
-10. Product Dashboard switch from Admin.
-11. Add product to cart and checkout.
-12. Customer login using `customer@example.com / Customer123!`.
-13. Show that Customer can access Product Dashboard only and not Admin CRUD.
-14. Add or update one record, then show KPI counts refreshing.
-15. Open FastAPI docs at `http://127.0.0.1:8000/docs` to show backend API.
-16. Open MySQL Workbench and show seeded tables: `users`, `roles`, `permissions`, `orders`, `reports`, `audit_logs`.
-
-## API Highlights
-
-```text
-POST /api/v1/auth/token
-POST /api/v1/auth/refresh
-GET  /api/v1/shop/products
-POST /api/v1/shop/checkout
-GET  /api/v1/database/summary
-GET  /api/v1/database/users
-GET  /api/v1/database/roles
-GET  /api/v1/database/permissions
-GET  /api/v1/database/orders
-GET  /api/v1/database/reports
-GET  /api/v1/database/planning-requests
-GET  /api/v1/database/audit-logs
-```
-
-## Notes
-
-- Keep backend and frontend running in separate terminals.
-- Keep `.env` private. Do not commit real passwords or production secrets.
-- For local demo, use the seeded accounts listed above.
-- For production, replace the `SECRET_KEY`, database credentials, and demo passwords.
-
-
-## Latest startup fix
-
-If you see `Unknown column 'orders.idempotency_key' in 'field list'`, use this updated version. The backend now auto-upgrades the local MySQL schema when `AUTO_CREATE_DB=true`. See `MYSQL_IDEMPOTENCY_SCHEMA_FIX.md` for details and manual SQL fallback.
 
 ---
 
-## Full Enterprise Microservice Mode
-
-This project now includes a full enterprise-style microservice setup with separate databases:
-
-- Auth DB
-- Order DB
-- Inventory DB
-- Notification DB
-
-It also includes:
-
-- RabbitMQ message queue
-- service-to-service JWT authentication through `X-Service-Token`
-- OpenTelemetry/Jaeger tracing hooks
-- Alembic migration folders per service
-- outbox pattern for reliable event publishing
-- 3 service nodes/replicas per microservice
-
-Read the full guide:
-
-```text
-ENTERPRISE_MICROSERVICES_FULL_REPORT.md
-```
-
-### Run with Docker
+## 1. Allow PowerShell Scripts and Activate Virtual Environment
 
 ```powershell
-.\start-microservices.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
 ```
 
-### Run without Docker
+---
+
+## 2. Stop Old Running Services First
 
 ```powershell
-.\start-microservices-local.ps1
+.\stop-microservices-local.ps1
+.\stop-frontend.ps1
 ```
 
-### Local demo admin account
+Optional force-stop old Python and Node processes:
 
-```text
-admin@example.com / Admin@12345
+```powershell
+Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
-### Enterprise endpoints
+---
 
-```text
-http://127.0.0.1:8000/api/v1/health
-http://127.0.0.1:8000/api/v1/ready
-http://127.0.0.1:8000/api/v1/service-info
-```
-
-## Alembic Migration Dependency Fix
-
-If you see this error:
-
-```text
-ModuleNotFoundError: No module named 'alembic'
-```
-
-Run this from the project root:
+## 3. Install Backend and Frontend Dependencies
 
 ```powershell
 .\install-enterprise-deps.ps1
 ```
 
-Then run local enterprise migrations:
-
 ```powershell
-.\run-enterprise-migrations.ps1
+cd frontend
+npm install
+cd ..
 ```
-
-Or run the Python command directly after installing requirements:
-
-```powershell
-.\.venv\Scripts\python.exe -m backend.enterprise.scripts.run_enterprise_migrations --local
-```
-
-For production/MySQL migration mode, configure the four database URLs first and run without `--local`.
-
-See `ALEMBIC_MIGRATION_DEPENDENCY_FIX.md` for details.
-
-## Windows `[WinError 10013]` Socket Fix
-
-If Windows blocks the gateway or service ports, run:
-
-```powershell
-.\stop-microservices-local.ps1
-.\start-microservices-local.ps1
-```
-
-The local startup script now probes ports before starting Uvicorn. If `8000`, `8101`, `8201`, `8301`, or `8401` are blocked/reserved, it automatically uses safe fallback ports and writes the selected API URL to:
-
-```text
-frontend/.env.local
-```
-
-To diagnose blocked/reserved ports, run:
-
-```powershell
-.\diagnose-windows-ports.ps1
-```
-
-Then restart the frontend so Vite reads the updated `.env.local` file.
 
 ---
 
-## Four Dedicated MySQL Databases for Enterprise Microservices
-
-To show the enterprise database-per-service setup in MySQL Workbench, run:
+## 4. Check MySQL Connection
 
 ```powershell
-.\setup-enterprise-mysql.ps1
+.\diagnose-mysql-connection.ps1
 ```
 
-This creates:
+If MySQL is stopped, run:
+
+```powershell
+.\repair-mysql-connection.ps1 -StartIfStopped
+```
+
+---
+
+## 5. Repair and Sync Enterprise `.env`
+
+```powershell
+.\repair-enterprise-env.ps1
+.\sync-enterprise-env-app-user.ps1
+```
+
+---
+
+## 6. Verify the Four Dedicated Databases
+
+```powershell
+.\verify-enterprise-mysql-databases.ps1
+```
+
+Expected databases:
 
 ```text
 finmark_auth_db
@@ -615,359 +397,375 @@ finmark_inventory_db
 finmark_notification_db
 ```
 
-It also updates `.env`, runs Alembic migrations, and seeds demo data.
+---
 
-If `mysql.exe` is not available in PowerShell, open this file in MySQL Workbench and execute it manually:
-
-```text
-setup-4-dedicated-databases-workbench.sql
-```
-
-Then run:
+## 7. Run Migrations and Seed Demo Data
 
 ```powershell
-.\run-enterprise-migrations-mysql.ps1
-.\verify-enterprise-mysql-databases.ps1
-.\start-microservices-local-mysql.ps1
-```
-
-See the full guide:
-
-```text
-MYSQL_WORKBENCH_4_DATABASE_SETUP.md
-```
-
-## Alembic `%40` MySQL Password Fix
-
-If migrations fail with `ValueError: invalid interpolation syntax` and your database URL contains `%40`, use this fixed version. The four enterprise Alembic `env.py` files now escape `%` before writing the URL into Alembic's ConfigParser.
-
-Keep the `.env` database URLs with `%40` when the MySQL password contains `@`:
-
-```env
-AUTH_DATABASE_URL=mysql+pymysql://finmark_app:FinmarkApp%402026!@127.0.0.1:3306/finmark_auth_db
-ORDER_DATABASE_URL=mysql+pymysql://finmark_app:FinmarkApp%402026!@127.0.0.1:3306/finmark_order_db
-INVENTORY_DATABASE_URL=mysql+pymysql://finmark_app:FinmarkApp%402026!@127.0.0.1:3306/finmark_inventory_db
-NOTIFICATION_DATABASE_URL=mysql+pymysql://finmark_app:FinmarkApp%402026!@127.0.0.1:3306/finmark_notification_db
-```
-
-Then run:
-
-```powershell
-.\run-enterprise-migrations-mysql.ps1
-```
-
-## MySQL `root` Access Denied in Enterprise 4-DB Mode
-
-If login returns:
-
-```text
-Access denied for user 'root'@'localhost'
-```
-
-you are likely running the legacy single-app backend instead of the enterprise 4-database microservice launcher. Run:
-
-```powershell
-.\fix-mysql-root-access-denied.ps1
-.\verify-enterprise-mysql-databases.ps1
-.\start-microservices-local-mysql.ps1
-```
-
-See `MYSQL_ROOT_ACCESS_DENIED_ENTERPRISE_FIX.md` for details.
-
-
-### Fix for empty DATABASE_URL sync error
-
-If `sync-enterprise-env-app-user.ps1` reports that `DATABASE_URL` cannot be an empty string, use the updated scripts in this package. The legacy single-database `DATABASE_URL` is removed, and the app uses the four dedicated enterprise URLs instead.
-
-Run:
-
-```powershell
-.\sync-enterprise-env-app-user.ps1
 .\run-enterprise-migrations-mysql.ps1
 .\seed-enterprise-mysql.ps1
-.\verify-enterprise-mysql-databases.ps1
 ```
 
-Verification should show `finmark_app:***`, not `root:***`, in the database URLs.
+Optional admin login repair:
 
+```powershell
+.\repair-enterprise-admin-login.ps1
+```
 
-## Windows .env File Lock Fix
+---
 
-If you see:
+## 8. Start the Microservices
+
+```powershell
+.\start-microservices-local-mysql.ps1
+.\start-microservices-local.ps1
+```
+
+Wait until you see messages like:
 
 ```text
-Set-Content : The process cannot access the file '.env' because it is being used by another process.
+Started auth-service-1
+Started order-service-1
+Started inventory-service-1
+Started notification-service-1
+Started local-api-gateway
 ```
 
-Run:
-
-```powershell
-.\stop-microservices-local.ps1
-.\sync-enterprise-env-app-user.ps1
-.\start-microservices-local-mysql.ps1
-```
-
-If `.env` is open in VS Code or Notepad, close it first. The sync script now retries and writes `.env` only once to avoid Windows file-lock issues.
-
-If `.env` is already correct, you can bypass startup sync:
-
-```powershell
-.\start-microservices-local-mysql.ps1 -SkipEnvSync
-```
-
-
-## Windows locked microservice log fix
-
-If startup reports that it cannot remove `logs\microservices\*.log`, use the latest launcher. It creates unique log files per run instead of deleting old locked files.
-
-```powershell
-.\stop-microservices-local.ps1
-.\start-microservices-local-mysql.ps1
-```
-
-Optional cleanup:
-
-```powershell
-.\clear-microservice-logs.ps1
-```
-
-
-## Fix: .env blank or empty sync error
-
-If you see:
-
-```powershell
-Get-FinMarkDotEnvNewLines : Cannot bind argument to parameter 'OriginalLines' because it is an empty string.
-```
-
-run:
-
-```powershell
-.\stop-microservices-local.ps1
-.
-epair-enterprise-env.ps1
-.erify-enterprise-mysql-databases.ps1
-.\seed-enterprise-mysql.ps1
-.\start-microservices-local-mysql.ps1
-```
-
-If the four database URLs are already correct and you only want to start the services, run:
-
-```powershell
-.\start-microservices-local-mysql.ps1 -SkipEnvSync
-```
-
-
-## Latest MySQL Connection Refused Fix
-
-If migration fails with `WinError 10061` or `Can't connect to MySQL server on 127.0.0.1`, the MySQL server is not reachable at the host/port in `.env`.
-
-Run:
-
-```powershell
-.\diagnose-mysql-connection.ps1
-```
-
-Then repair/start MySQL:
-
-```powershell
-.\repair-mysql-connection.ps1 -StartIfStopped
-```
-
-If MySQL Workbench uses another port, repair the `.env` using that port:
-
-```powershell
-.\repair-mysql-connection.ps1 -HostName 127.0.0.1 -Port 3307 -StartIfStopped
-```
-
-After MySQL is reachable:
-
-```powershell
-.\setup-enterprise-mysql.ps1
-.\run-enterprise-migrations-mysql.ps1
-.\seed-enterprise-mysql.ps1
-.\start-microservices-local-mysql.ps1
-.\start-frontend.ps1
-```
-
-Do not extract new project ZIPs over a running project folder. Stop services first:
-
-```powershell
-.\stop-microservices-local.ps1
-.\stop-frontend.ps1
-```
-
-## Important: Enterprise Microservice Startup Command
-
-For the full enterprise 4-database microservice version, do **not** start the backend with:
-
-```powershell
-python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-That command starts the older monolith compatibility app and may try to use the legacy `finmark_db` database. The least-privilege `finmark_app` user is designed for the four dedicated databases only.
-
-Use this instead:
-
-```powershell
-.\start-microservices-local-mysql.ps1
-.\start-frontend.ps1
-```
-
-If you accidentally run the old Uvicorn command, the project now shows a clear guard message instead of crashing with a MySQL access-denied traceback.
-
-See `WRONG_BACKEND_COMMAND_ENTERPRISE_FIX.md` for details.
-
-
-## Legacy Users/Roles Migration to Dedicated Auth DB
-
-To copy users, roles, permissions, user-role links, and role-permission links from the old monolith database `finmark_db` into `finmark_auth_db`, run:
-
-```powershell
-.\migrate-legacy-auth-to-enterprise.ps1 -LegacyUser root -PromptForLegacyPassword
-```
-
-If `finmark_app` should be used to read the old database, first run `grant-legacy-auth-read-workbench.sql` in MySQL Workbench as root/admin, then run:
-
-```powershell
-.\migrate-legacy-auth-to-enterprise.ps1 -UseFinmarkAppForLegacyRead
-```
-
-The migration guarantees that `admin@example.com` has full Administrator permissions and can open both the Admin Dashboard and Product Dashboard.
-
-Verify in MySQL Workbench with:
+The active gateway is usually:
 
 ```text
-verify-auth-migration-workbench.sql
+http://127.0.0.1:18000/api/v1
 ```
 
-## Manage Order List Fix
+---
 
-If checkout succeeds but the Admin Dashboard does not show the order, use this fixed build. The frontend now reads orders from the dedicated Order Service endpoint `/api/v1/orders`, and `/api/v1/database/orders` remains available as a compatibility route. See `ORDER_MANAGE_LIST_FIX.md`.
-
-
-## Checkout to Admin Order List Verification
-
-Start the enterprise MySQL microservices first:
+## 9. Check if All Nodes Are Running by Ports
 
 ```powershell
-.\start-microservices-local-mysql.ps1
+8101,8102,8103,8201,8202,8203,8301,8302,8303,8401,8402,8403,18000 |
+ForEach-Object {
+    $test = Test-NetConnection 127.0.0.1 -Port $_ -WarningAction SilentlyContinue
+    [PSCustomObject]@{
+        Port = $_
+        Running = $test.TcpTestSucceeded
+    }
+} | Format-Table -AutoSize
 ```
 
-Then verify checkout-to-admin-order-list flow:
+Expected result:
+
+```text
+8101 True   Auth node 1
+8102 True   Auth node 2
+8103 True   Auth node 3
+
+8201 True   Order node 1
+8202 True   Order node 2
+8203 True   Order node 3
+
+8301 True   Inventory node 1
+8302 True   Inventory node 2
+8303 True   Inventory node 3
+
+8401 True   Notification node 1
+8402 True   Notification node 2
+8403 True   Notification node 3
+
+18000 True  API Gateway
+```
+
+---
+
+## 10. Show Microservice Nodes Clearly
+
+```powershell
+$nodes = @(
+    @{Service="Auth"; Node="auth-service-1"; Port=8101},
+    @{Service="Auth"; Node="auth-service-2"; Port=8102},
+    @{Service="Auth"; Node="auth-service-3"; Port=8103},
+
+    @{Service="Order"; Node="order-service-1"; Port=8201},
+    @{Service="Order"; Node="order-service-2"; Port=8202},
+    @{Service="Order"; Node="order-service-3"; Port=8203},
+
+    @{Service="Inventory"; Node="inventory-service-1"; Port=8301},
+    @{Service="Inventory"; Node="inventory-service-2"; Port=8302},
+    @{Service="Inventory"; Node="inventory-service-3"; Port=8303},
+
+    @{Service="Notification"; Node="notification-service-1"; Port=8401},
+    @{Service="Notification"; Node="notification-service-2"; Port=8402},
+    @{Service="Notification"; Node="notification-service-3"; Port=8403},
+
+    @{Service="Gateway"; Node="local-api-gateway"; Port=18000}
+)
+
+$nodes | ForEach-Object {
+    $test = Test-NetConnection 127.0.0.1 -Port $_.Port -WarningAction SilentlyContinue
+    [PSCustomObject]@{
+        Service = $_.Service
+        Node    = $_.Node
+        URL     = "http://127.0.0.1:$($_.Port)"
+        Status  = if ($test.TcpTestSucceeded) { "RUNNING" } else { "STOPPED" }
+    }
+} | Format-Table -AutoSize
+```
+
+---
+
+## 11. Test Gateway Health
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:18000/api/v1/health
+```
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:18000/api/v1/ready
+```
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:18000/api/v1/service-info
+```
+
+---
+
+## 12. Test Auth Login
+
+```powershell
+$login = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://127.0.0.1:18000/api/v1/auth/token" `
+  -ContentType "application/x-www-form-urlencoded" `
+  -Body "username=admin@example.com&password=Admin@12345"
+
+$login
+```
+
+Save token:
+
+```powershell
+$token = $login.access_token
+$headers = @{ Authorization = "Bearer $token" }
+```
+
+Test current user:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:18000/api/v1/auth/me" `
+  -Headers $headers
+```
+
+---
+
+## 13. Test Inventory Service
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:18000/api/v1/inventory/products" `
+  -Headers $headers
+```
+
+---
+
+## 14. Test Order List API
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:18000/api/v1/orders" `
+  -Headers $headers
+```
+
+Compatibility route:
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:18000/api/v1/database/orders" `
+  -Headers $headers
+```
+
+---
+
+## 15. Test Checkout to Admin Order List
 
 ```powershell
 .\verify-checkout-admin-order-list.ps1
 ```
 
-If no gateway is running, the verifier can start it automatically:
+Expected result:
 
-```powershell
-.\verify-checkout-admin-order-list.ps1 -StartIfDown
+```text
+PASS: Admin Manage Order List can read the newly checked-out order
 ```
 
-The verifier now auto-detects the gateway port from `.microservices`, `frontend\.env.local`, and common fallback ports.
+---
 
-
-## Order Debug Route 404 Fix
-
-If `diagnose-admin-order-list.ps1` fails with `{"detail":"Not Found"}` at the Order Service debug summary step, stop old service processes and start the fixed local microservices again:
+## 16. Test Order Edit / Update
 
 ```powershell
-.\stop-microservices-local.ps1
-.\stop-frontend.ps1
-.\start-microservices-local-mysql.ps1
-.\start-frontend.ps1
+.\verify-admin-order-edit.ps1
+```
+
+Expected result:
+
+```text
+PASS: Admin Order Edit successfully updated order
+```
+
+---
+
+## 17. Test Admin Order List Diagnostic
+
+```powershell
 .\diagnose-admin-order-list.ps1
 ```
 
-The fixed diagnostic script now falls back to the real order-list endpoints even if a debug route is missing on an older running service. See `ORDER_DEBUG_ROUTE_FIX.md`.
+---
 
-## API base route
-
-Opening the API base URL `/api/v1` now shows a gateway index with available microservice prefixes. Use `/api/v1/health`, `/api/v1/ready`, `/api/v1/service-info`, `/api/v1/auth`, `/api/v1/orders`, `/api/v1/inventory`, or `/api/v1/notifications` for actual API actions.
-
-## Admin Order List shows no records after checkout
-
-If `verify-checkout-admin-order-list.ps1` can create and search a new order, but the browser Admin Dashboard still says **No orders found**, repair old seeded order statuses:
+## 18. Test Notification Service
 
 ```powershell
-.\repair-order-statuses.ps1
-.\stop-microservices-local.ps1
-.\start-microservices-local-mysql.ps1
-.\stop-frontend.ps1
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://127.0.0.1:18000/api/v1/notifications" `
+  -Headers $headers
+```
+
+---
+
+## 19. Start Frontend
+
+```powershell
 .\start-frontend.ps1
 ```
 
-Cause: older Workbench demo seed scripts inserted lowercase order statuses such as `paid` and `completed`. The Enterprise Order Service now normalizes status values, and `repair-order-statuses.ps1` updates existing rows in `finmark_order_db.order_orders`.
+Open the URL printed by Vite, usually:
 
-## Admin Order Edit Fix
-
-If orders appear in Admin Dashboard but **Edit / Save changes** fails, run:
-
-```powershell
-.\verify-admin-order-edit.ps1
+```text
+http://127.0.0.1:5173
 ```
 
-This verifies that the Order Service can update an order through the same route used by the Admin Dashboard. The fix prevents duplicate `(order_id, product_id)` failures when replacing order items during edit.
+If port `5173` is busy, the script should use another port.
 
+---
 
-## Admin Order Edit Internal Server Error Fix
+## 20. Browser Test Flow
 
-If order delete works but order edit fails with `Internal Server Error`, extract the latest fixed ZIP and restart all services:
+Login using:
+
+```text
+admin@example.com
+Admin@12345
+```
+
+Then test:
+
+```text
+1. Product Dashboard
+2. Add product to cart
+3. Checkout
+4. Admin Dashboard
+5. Orders / Manage Order List
+6. Click Refresh
+7. Click Edit
+8. Edit form should focus/scroll
+9. Save edit
+10. Notification should appear
+```
+
+If the browser still shows old data, press:
+
+```text
+Ctrl + F5
+```
+
+---
+
+## 21. Stop Everything After Testing
 
 ```powershell
+.\stop-frontend.ps1
+.\stop-microservices-local.ps1
+```
+
+Optional force stop:
+
+```powershell
+Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force
+Get-Process node -ErrorAction SilentlyContinue | Stop-Process -Force
+```
+
+---
+
+## 22. Commands You Should Not Use Anymore
+
+Do not run this for the enterprise microservice version:
+
+```powershell
+python -m uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Use this instead:
+
+```powershell
+.\start-microservices-local-mysql.ps1
+```
+
+The system now runs through:
+
+```text
+API Gateway
+Auth Service x3
+Order Service x3
+Inventory Service x3
+Notification Service x3
+Four dedicated MySQL databases
+```
+
+---
+
+## Quick Demo Command Set
+
+Use this shorter set during project defense:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
 .\stop-microservices-local.ps1
 .\stop-frontend.ps1
+.\verify-enterprise-mysql-databases.ps1
 .\start-microservices-local-mysql.ps1
+```
+
+Check nodes:
+
+```powershell
+8101,8102,8103,8201,8202,8203,8301,8302,8303,8401,8402,8403,18000 |
+ForEach-Object {
+    $test = Test-NetConnection 127.0.0.1 -Port $_ -WarningAction SilentlyContinue
+    [PSCustomObject]@{
+        Port = $_
+        Running = $test.TcpTestSucceeded
+    }
+} | Format-Table -AutoSize
+```
+
+Test APIs:
+
+```powershell
+Invoke-RestMethod http://127.0.0.1:18000/api/v1/health
+Invoke-RestMethod http://127.0.0.1:18000/api/v1/service-info
+.\verify-checkout-admin-order-list.ps1
+.\verify-admin-order-edit.ps1
+```
+
+Start frontend:
+
+```powershell
 .\start-frontend.ps1
-.\verify-admin-order-edit.ps1
 ```
 
-This fix updates `backend/enterprise/services/order_enterprise_service.py` to replace order items using a MySQL-safe bulk delete + flush + insert sequence.
-
-## Admin Order Edit Final Transaction Fix
-
-If checkout and order listing work but Admin Order Edit returns `Internal Server Error`, use the latest transaction-safe update logic. The Order Service now skips no-op item replacement, loads the order parent row without stale child relationships, and returns clearer API errors if MySQL rejects an update.
-
-Run:
-
-```powershell
-.\stop-microservices-local.ps1
-.\stop-frontend.ps1
-.\start-microservices-local-mysql.ps1
-.\start-frontend.ps1
-.\verify-admin-order-edit.ps1
-```
-
-See `ORDER_EDIT_FINAL_TRANSACTION_FIX.md` for details.
-
-## Order Edit Focus + Notification Update
-
-This build includes the final order-edit workflow improvement:
-
-- Clicking **Edit** in Admin Dashboard → Orders now scrolls to and focuses the edit form.
-- Saving an edited order shows a sticky edit notification in the Admin Dashboard.
-- The Order Service emits an `order.updated` event.
-- The Notification Service can create an in-app notification from that edit event.
-
-Run this verifier after starting the services:
-
-```powershell
-.\verify-admin-order-edit.ps1
-```
-
-See `ORDER_EDIT_FOCUS_NOTIFICATION_REFACTOR.md` for details.
-
-## Enterprise Validation and Missing-Input Handling
-
-This build includes enterprise-grade validation for frontend forms and backend API endpoints. Missing/null/invalid values now return controlled 400/422-style responses with clear messages instead of causing application crashes.
-
-Run the validation test after starting the local microservices:
-
-```powershell
-.\start-microservices-local-mysql.ps1
 .\verify-invalid-input-handling.ps1
-```
-
-See `VALIDATION_ERROR_HANDLING_REPORT.md` for the full validation scope.
